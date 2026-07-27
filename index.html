@@ -276,19 +276,26 @@
 
     <div id="account-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center backdrop-blur-sm bg-black/40 p-4">
         <div class="modal-content bg-white p-6 w-full max-w-sm shadow-2xl border-2 border-black text-center">
-            <div class="flex justify-between items-start mb-5">
+            <div class="flex justify-between items-start mb-4">
                 <h3 class="text-2xl font-black uppercase tracking-tighter">Account</h3>
                 <button onclick="document.getElementById('account-modal').classList.add('hidden')" class="text-2xl font-bold leading-none p-1 text-gray-400 hover:text-black">&times;</button>
             </div>
-            <input type="text" id="acc-username" placeholder="USERNAME (3-12, A-Z 0-9)" maxlength="12" autocomplete="username"
-                   class="w-full bg-gray-100 border-2 border-gray-200 p-3 font-bold text-center uppercase tracking-widest focus:outline-none focus:border-black mb-2">
-            <input type="password" id="acc-password" placeholder="PASSWORD (6+)" autocomplete="current-password"
-                   class="w-full bg-gray-100 border-2 border-gray-200 p-3 font-bold text-center tracking-widest focus:outline-none focus:border-black mb-2">
-            <p id="acc-error" class="text-xs font-bold text-red-600 min-h-[16px] mb-2"></p>
-            <div class="flex gap-2 mb-2">
-                <button id="acc-login-btn" class="flex-1 bg-black text-white hover:bg-gray-800 font-bold py-3 text-xs tracking-widest uppercase transition-colors">Log In</button>
-                <button id="acc-signup-btn" class="flex-1 bg-blue-600 text-white hover:bg-blue-700 font-bold py-3 text-xs tracking-widest uppercase transition-colors">Sign Up</button>
+
+            <div class="flex border-2 border-black mb-4">
+                <button id="acc-tab-login" class="flex-1 py-2.5 text-xs font-black uppercase tracking-widest transition-colors">Log In</button>
+                <button id="acc-tab-signup" class="flex-1 py-2.5 text-xs font-black uppercase tracking-widest transition-colors">Sign Up</button>
             </div>
+
+            <input type="text" id="acc-username" placeholder="USERNAME" maxlength="12" autocomplete="username"
+                   class="w-full bg-gray-100 border-2 border-gray-200 p-3 font-bold text-center uppercase tracking-widest focus:outline-none focus:border-black mb-2">
+            <input type="password" id="acc-password" placeholder="PASSWORD" autocomplete="current-password"
+                   class="w-full bg-gray-100 border-2 border-gray-200 p-3 font-bold text-center tracking-widest focus:outline-none focus:border-black mb-2">
+            <p id="acc-hint" class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2" style="display:none">ID: 3-12 letters/numbers &middot; Password: 6+ characters</p>
+            <p id="acc-error" class="text-xs font-bold text-red-600 min-h-[16px] mb-1"></p>
+            <p id="acc-success" class="text-xs font-bold text-green-600 mb-1"></p>
+
+            <button id="acc-submit-btn" class="w-full text-white font-bold py-3.5 text-xs tracking-widest uppercase transition-colors mb-2">Log In</button>
+
             <div class="flex items-center gap-2 my-3">
                 <div class="flex-1 h-px bg-gray-200"></div>
                 <span class="text-[10px] font-bold text-gray-300 uppercase tracking-widest">or</span>
@@ -307,7 +314,7 @@
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h3 class="text-2xl font-black uppercase tracking-tighter leading-none">Rank Chart</h3>
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Rank up every 10 wins</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Win +1 pt &middot; Loss &minus;1 pt &middot; Rank changes every 10 pts</p>
                 </div>
                 <button onclick="document.getElementById('ranks-modal').classList.add('hidden')" class="text-2xl font-bold leading-none p-1 text-gray-400 hover:text-black">&times;</button>
             </div>
@@ -391,7 +398,23 @@
                 </div>
 
                 <div class="flex flex-col gap-3 w-full max-w-md">
-                    <div id="nickname-section" class="w-full">
+
+                    <div id="welcome-section" class="w-full flex flex-col gap-2.5">
+                        <button onclick="window.openAccount()"
+                                class="w-full bg-black text-white hover:bg-gray-800 font-black py-4 text-sm tracking-[0.25em] uppercase transition-all shadow-lg">
+                            Log In / Sign Up
+                        </button>
+                        <button onclick="window.openHowto()"
+                                class="w-full bg-white text-black border-2 border-black hover:bg-black hover:text-white font-bold py-3.5 text-xs tracking-widest uppercase transition-colors">
+                            &#9654; How to Play
+                        </button>
+                        <button id="guest-link"
+                                class="self-center text-[10px] text-gray-400 hover:text-black font-bold uppercase tracking-[0.2em] underline underline-offset-2 mt-1 transition-colors">
+                            Play as guest
+                        </button>
+                    </div>
+
+                    <div id="nickname-section" class="w-full hidden">
                         <input type="text" id="nickname-input" placeholder="ENTER YOUR NAME" maxlength="10" 
                                class="w-full bg-gray-100 border-2 border-gray-200 p-4 font-bold text-center uppercase tracking-widest focus:outline-none focus:border-black transition-colors mb-3">
                         <button id="join-queue-btn" disabled
@@ -501,7 +524,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, linkWithCredential, EmailAuthProvider, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, linkWithCredential, EmailAuthProvider, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
         import { 
             getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, 
@@ -1051,6 +1074,7 @@
             boardElement.innerHTML = `<div class="col-span-5 flex items-center justify-center h-full text-white text-xl font-bold tracking-widest uppercase bg-waiting-rainbow shadow-inner">Waiting for match</div>`;
              
             setupPlayAgainListener();
+            if (typeof updateLobbyUI === 'function') updateLobbyUI();
         }
 
         async function enterGame(id) {
@@ -1645,12 +1669,32 @@
         const accUser = document.getElementById('acc-username');
         const accPass = document.getElementById('acc-password');
         const accError = document.getElementById('acc-error');
+        const accSuccess = document.getElementById('acc-success');
+        let lastSignupName = "";
+        let guestMode = false;
+
+        // 첫 화면(로그인 유도) ↔ 플레이 화면(이름+매치) 전환
+        function updateLobbyUI() {
+            const entered = !!myAccountName || guestMode;
+            const ws = document.getElementById('welcome-section');
+            if (ws) ws.classList.toggle('hidden', entered);
+            if (!entered) {
+                nicknameSection.classList.add('hidden');
+            } else if (!gameId && !queueDocId) {
+                nicknameSection.classList.remove('hidden');
+            }
+        }
+        document.getElementById('guest-link').addEventListener('click', () => {
+            guestMode = true;
+            updateLobbyUI();
+            nicknameInput.focus();
+        });
         const accountBtn = document.getElementById('account-btn');
         const myRecordEl = document.getElementById('my-record');
         let myAccountName = null;
         let myWinsCache = 0;
 
-        // --- 계급표: 10승마다 승급 ---
+        // --- 계급표: 랭크 포인트(승-패) 10점 단위, 승급/강등 모두 가능 ---
         const RANKS = [
             { min: 0,  name: 'HATCHLING', bg: '#9ca3af' },
             { min: 10, name: 'RED SCALE', bg: 'linear-gradient(135deg,#ff7b7b,#dd0000)' },
@@ -1684,7 +1728,7 @@
                 if (next) {
                     const pct = Math.min(100, ((wins - rk.min) / (next.min - rk.min)) * 100);
                     bar.style.width = pct + '%';
-                    label.textContent = (next.min - wins) + ' WINS TO ' + next.name;
+                    label.textContent = (next.min - wins) + ' PTS TO ' + next.name;
                 } else {
                     bar.style.width = '100%';
                     label.textContent = 'MAX RANK';
@@ -1703,7 +1747,7 @@
                     '<div class="cham-mask shrink-0" style="width:36px;height:24px;background:' + r.bg + '"></div>' +
                     '<span class="flex-1 text-xs font-black uppercase tracking-widest">' + r.name + '</span>' +
                     (isMine ? '<span class="text-[9px] font-black bg-black text-white px-1.5 py-0.5 rounded mr-1">YOU</span>' : '') +
-                    '<span class="text-[10px] font-bold text-gray-400">' + r.min + '+ WINS</span>';
+                    '<span class="text-[10px] font-bold text-gray-400">' + r.min + '+ PTS</span>';
                 list.appendChild(row);
             });
             document.getElementById('ranks-modal').classList.remove('hidden');
@@ -1735,38 +1779,69 @@
                 }
                 return;
             }
-            accError.textContent = "";
-            accUser.value = ""; accPass.value = "";
+            setAccMode('login');
+            accUser.value = lastSignupName || "";
+            accPass.value = "";
             accModal.classList.remove('hidden');
-            accUser.focus();
+            (accUser.value ? accPass : accUser).focus();
         };
-        document.getElementById('acc-signup-btn').addEventListener('click', async () => {
+        // --- 로그인/가입 탭 ---
+        let accMode = 'login';
+        const accSubmit = document.getElementById('acc-submit-btn');
+        const tabLogin = document.getElementById('acc-tab-login');
+        const tabSignup = document.getElementById('acc-tab-signup');
+        function setAccMode(m) {
+            accMode = m;
+            accError.textContent = ""; accSuccess.textContent = "";
+            const on = "bg-black text-white";
+            const off = "bg-white text-gray-400 hover:text-black";
+            tabLogin.className  = "flex-1 py-2.5 text-xs font-black uppercase tracking-widest transition-colors " + (m === 'login' ? on : off);
+            tabSignup.className = "flex-1 py-2.5 text-xs font-black uppercase tracking-widest transition-colors " + (m === 'signup' ? on : off);
+            accSubmit.textContent = m === 'login' ? 'Log In' : 'Create Account';
+            accSubmit.className = "w-full text-white font-bold py-3.5 text-xs tracking-widest uppercase transition-colors mb-2 " +
+                (m === 'login' ? 'bg-black hover:bg-gray-800' : 'bg-blue-600 hover:bg-blue-700');
+            document.getElementById('acc-hint').style.display = m === 'signup' ? 'block' : 'none';
+            accPass.autocomplete = m === 'signup' ? 'new-password' : 'current-password';
+        }
+        tabLogin.addEventListener('click', () => setAccMode('login'));
+        tabSignup.addEventListener('click', () => setAccMode('signup'));
+        setAccMode('login');
+
+        accSubmit.addEventListener('click', async () => {
             const v = validAccInput(); if (!v) return;
-            accError.textContent = "";
-            try {
-                // 익명 계정을 그대로 승격 → 지금 세션의 uid/전적 유지
-                const cred = EmailAuthProvider.credential(toFakeEmail(v.u), v.p);
-                await linkWithCredential(auth.currentUser, cred);
-                onAccountReady(v.u);
-                accModal.classList.add('hidden');
-            } catch (e) {
-                if (e.code === 'auth/email-already-in-use') accError.textContent = "Username already taken";
-                else if (e.code === 'auth/credential-already-in-use') accError.textContent = "Username already taken";
-                else accError.textContent = "Sign up failed: " + (e.code || e.message);
-            }
-        });
-        document.getElementById('acc-login-btn').addEventListener('click', async () => {
-            const v = validAccInput(); if (!v) return;
-            accError.textContent = "";
-            try {
-                const res = await signInWithEmailAndPassword(auth, toFakeEmail(v.u), v.p);
-                userId = res.user.uid;
-                onAccountReady(v.u);
-                accModal.classList.add('hidden');
-            } catch (e) {
-                if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found')
-                    accError.textContent = "Wrong username or password";
-                else accError.textContent = "Log in failed: " + (e.code || e.message);
+            accError.textContent = ""; accSuccess.textContent = "";
+            if (accMode === 'signup') {
+                // 가입: 계정만 저장하고 로그인은 시키지 않음 → 성공 표시 후 창 닫힘 → 직접 로그인
+                try {
+                    accSubmit.disabled = true;
+                    await createUserWithEmailAndPassword(auth, toFakeEmail(v.u), v.p);
+                    await signOut(auth);
+                    const anon = await signInAnonymously(auth); // 게임용 게스트 세션 복구
+                    userId = anon.user.uid;
+                    lastSignupName = v.u;
+                    accSuccess.textContent = "\u2713 ACCOUNT CREATED \u2014 PLEASE LOG IN";
+                    setTimeout(() => {
+                        accModal.classList.add('hidden');
+                        accSuccess.textContent = "";
+                        setAccMode('login');
+                    }, 1500);
+                } catch (e) {
+                    if (e.code === 'auth/email-already-in-use') accError.textContent = "Username already taken";
+                    else if (e.code === 'auth/operation-not-allowed') accError.textContent = "Enable Email/Password in Firebase console";
+                    else accError.textContent = "Sign up failed: " + (e.code || e.message);
+                } finally { accSubmit.disabled = false; }
+            } else {
+                try {
+                    accSubmit.disabled = true;
+                    const res = await signInWithEmailAndPassword(auth, toFakeEmail(v.u), v.p);
+                    userId = res.user.uid;
+                    onAccountReady(v.u);
+                    accModal.classList.add('hidden');
+                } catch (e) {
+                    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found')
+                        accError.textContent = "Wrong username or password";
+                    else accError.textContent = "Log in failed: " + (e.code || e.message);
+                } finally { accSubmit.disabled = false; }
             }
         });
         document.getElementById('acc-google-btn').addEventListener('click', async () => {
@@ -1811,6 +1886,7 @@
             accountBtn.textContent = myAccountName + " \u00b7 LOG OUT";
             if (!nicknameInput.value.trim()) nicknameInput.value = myAccountName;
             joinBtn.disabled = nicknameInput.value.trim().length === 0;
+            updateLobbyUI();
             loadMyRecord();
         }
         async function loadMyRecord() {
@@ -1830,14 +1906,15 @@
                 }
                 const w = s.wins || 0, l = s.losses || 0, dr = s.draws || 0, g = s.games || 0;
                 const rate = g > 0 ? Math.round((w / g) * 100) : 0;
-                myWinsCache = w;
+                const pts = Math.max(0, w - l); // 랭크 포인트: 승 +1, 패 -1 (강등 가능)
+                myWinsCache = pts;
                 document.getElementById('record-section').classList.remove('hidden');
                 document.getElementById('record-name').textContent = myAccountName || '-';
                 document.getElementById('record-rate').textContent = rate + '%';
                 document.getElementById('rec-w').textContent = w;
                 document.getElementById('rec-l').textContent = l;
                 document.getElementById('rec-d').textContent = dr;
-                applyRankUI(w);
+                applyRankUI(pts);
             } catch (e) { console.warn("Record load failed:", e); }
         }
         // 접속 시 이미 계정 로그인 상태면 자동 복원
