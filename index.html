@@ -222,7 +222,7 @@
         ::-webkit-scrollbar-thumb { background: #d4d4d4; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-2 md:p-8" onclick="SoundManager.init()">
+<body class="flex flex-col items-center justify-center min-h-screen p-2 md:p-8" onclick="window.SoundManager && SoundManager.init()">
 
     <div id="message-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-[2px] bg-black/30">
         <div class="modal-content bg-white/20 border border-white/40 p-6 w-[80%] max-w-sm text-center backdrop-blur-md shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] rounded-xl relative">
@@ -273,6 +273,22 @@
             </div>
         </div>
     </div>
+
+    <button id="sound-toggle" onclick="window.toggleSound(event)"
+            class="fixed bottom-4 right-4 z-[95] w-11 h-11 flex items-center justify-center bg-white/90 backdrop-blur border border-gray-300 rounded-full shadow-lg text-gray-700 transition-transform duration-75 active:scale-90"
+            style="margin-bottom: env(safe-area-inset-bottom);"
+            title="Sound On/Off">
+        <svg id="snd-icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/>
+            <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+            <path d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/>
+        </svg>
+        <svg id="snd-icon-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/>
+            <line x1="15" y1="9" x2="21" y2="15"/>
+            <line x1="21" y1="9" x2="15" y2="15"/>
+        </svg>
+    </button>
 
     <div id="account-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center backdrop-blur-sm bg-black/40 p-4">
         <div class="modal-content bg-white p-6 w-full max-w-sm shadow-2xl border-2 border-black text-center">
@@ -354,13 +370,13 @@
         
         <div class="flex-1 flex flex-col p-6 md:p-10 relative">
             
-            <div class="mb-8 flex justify-between items-end">
+            <div class="mb-6 flex justify-between items-end">
                 <div class="flex items-center gap-3 md:gap-4">
                     <div>
-                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter title-rainbow">CHAMELLO</h1>
-                        <p class="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-[0.3em] mt-1">Tri-Color Territory Battle</p>
+                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter title-rainbow leading-none">CHAMELLO</h1>
+                        <p class="text-[9px] md:text-[11px] font-bold text-gray-400 uppercase tracking-[0.22em] mt-1.5 pl-0.5">Tri-Color Territory Battle</p>
                     </div>
-                    <div id="title-cham" class="chamello-icon cham-mask shrink-0" ondblclick="window.openRanks()" title="Double-click: Rank Chart"></div>
+                    <div id="title-cham" class="chamello-icon cham-mask shrink-0 self-center" ondblclick="window.openRanks()" title="Double-click: Rank Chart"></div>
                 </div>
                 <div id="desktop-timer-container" class="text-right hidden md:block">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TIMER</p>
@@ -519,6 +535,7 @@
                     <p id="rec-next-label" class="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center mt-1">-</p>
                 </div>
             </div>
+
         </div>
     </div>
 
@@ -534,10 +551,19 @@
         // --- Sound Manager ---
         window.SoundManager = {
             ctx: null,
+            muted: false,
+            master: null,
             init: function() {
-                if (this.ctx) return;
+                if (this.ctx) {
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    return;
+                }
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AudioContext();
+                this.master = this.ctx.createGain();
+                this.master.gain.value = this.muted ? 0 : 1;
+                this.master.connect(this.ctx.destination);
+                if (this.ctx.state === 'suspended') this.ctx.resume();
                 this.playAmbient();
                 
                 document.addEventListener('visibilitychange', async () => {
@@ -555,7 +581,7 @@
             playAmbient: function() {
                 const t = this.ctx.currentTime;
                 const gain = this.ctx.createGain();
-                gain.connect(this.ctx.destination);
+                gain.connect(this.master);
                 const freqs = [261.63, 329.63, 392.00, 493.88]; 
                 freqs.forEach((f, i) => {
                     const osc = this.ctx.createOscillator();
@@ -589,7 +615,7 @@
                 gain.gain.linearRampToValueAtTime(0.4, t + 0.01); 
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5); 
                 osc.connect(gain);
-                gain.connect(this.ctx.destination);
+                gain.connect(this.master);
                 osc.start(t); osc.stop(t + 1.5);
                 const osc2 = this.ctx.createOscillator();
                 const gain2 = this.ctx.createGain();
@@ -598,7 +624,7 @@
                 gain2.gain.setValueAtTime(0, t);
                 gain2.gain.linearRampToValueAtTime(0.05, t + 0.01);
                 gain2.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-                gain2.connect(this.ctx.destination);
+                gain2.connect(this.master);
                 osc2.start(t); osc2.stop(t + 1.0);
             },
             playConflict: function() { 
@@ -612,7 +638,7 @@
                 gain.gain.setValueAtTime(0.1, t);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
                 osc.connect(gain);
-                gain.connect(this.ctx.destination);
+                gain.connect(this.master);
                 osc.start(t); osc.stop(t + 0.5);
             },
             playTick: function() {
@@ -626,13 +652,34 @@
                 filter.frequency.value = 2000;
                 osc.connect(filter);
                 filter.connect(gain);
-                gain.connect(this.ctx.destination);
+                gain.connect(this.master);
                 osc.frequency.setValueAtTime(800, t);
                 gain.gain.setValueAtTime(0.15, t);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
                 osc.start(); osc.stop(t + 0.05);
             }
         };
+
+        // 사운드 토글 (마스터 볼륨 on/off)
+        window.toggleSound = (e) => {
+            if (e) e.stopPropagation();
+            const s = window.SoundManager;
+            s.init();
+            s.muted = !s.muted;
+            if (s.master) s.master.gain.value = s.muted ? 0 : 1;
+            document.getElementById('snd-icon-on').style.display = s.muted ? 'none' : 'block';
+            document.getElementById('snd-icon-off').style.display = s.muted ? 'block' : 'none';
+            const btn = document.getElementById('sound-toggle');
+            btn.title = s.muted ? 'Muted' : 'Sound On';
+            btn.classList.toggle('text-gray-300', s.muted);
+            btn.classList.toggle('text-gray-700', !s.muted);
+        };
+        // 어떤 첫 제스처(클릭/터치/키)든 오디오 시작 + 정지 복구 — 자동재생 정책 대응
+        ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                if (window.SoundManager) window.SoundManager.init();
+            }, { passive: true });
+        });
 
         // --- Config ---
         const BOARD_SIZE = 5;
@@ -762,6 +809,24 @@
         let lastTimerValue = ""; 
         let lastGameMode = null; 
         let isMoveCommitted = false; 
+
+        // --- 대기방 호스트 하트비트 (15초마다 생존 신호 → 끊기면 방 자동 소멸) ---
+        let roomHeartbeatTimer = null;
+        function startRoomHeartbeat() {
+            if (roomHeartbeatTimer) return;
+            const beat = () => {
+                if (gameId) {
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId), {
+                        hostSeen: serverTimestamp()
+                    }).catch(() => {});
+                }
+            };
+            beat();
+            roomHeartbeatTimer = setInterval(beat, 15000);
+        }
+        function stopRoomHeartbeat() {
+            if (roomHeartbeatTimer) { clearInterval(roomHeartbeatTimer); roomHeartbeatTimer = null; }
+        }
 
         // --- Strict Queue Watchdog ---
         let queueKickTimer = null;
@@ -1042,6 +1107,7 @@
 
         function resetLocalStateAndUI() {
             stopQueueWatchdog();
+            stopRoomHeartbeat();
             if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
             if (unsubscribeGame) { unsubscribeGame(); unsubscribeGame = null; }
             if (unsubscribeMyTicket) { unsubscribeMyTicket(); unsubscribeMyTicket = null; }
@@ -1132,6 +1198,8 @@
         };
 
         function handleGameUpdate(gameData) {
+            if (gameData.status === 'waiting' && gameData.hostId === userId) startRoomHeartbeat();
+            else stopRoomHeartbeat();
             if (gameId && userId && !gameData.players[userId]) {
                 resetLocalStateAndUI();
                 return;
@@ -1353,7 +1421,7 @@
         function updateTimerDisplay(text) {
             const displayText = isAnimating ? "0" : text;
             if(lastTimerValue !== displayText) {
-                if(window.SoundManager && displayText !== "0" && displayText !== "--") window.SoundManager.playTick();
+                if(window.SoundManager && displayText !== "0" && displayText !== "--" && displayText !== "\u00b7\u00b7\u00b7") window.SoundManager.playTick();
                 lastTimerValue = displayText;
             }
             timerDisplay.textContent = displayText;
@@ -1538,8 +1606,15 @@
                 const listEl = document.getElementById('open-rooms-list');
                 const countEl = document.getElementById('open-rooms-count');
                 if(!listEl) return;
-                const rooms = [];
-                snapshot.forEach(doc => { rooms.push({ id: doc.id, ...doc.data() }); });
+                const allRooms = [];
+                snapshot.forEach(doc => { allRooms.push({ id: doc.id, ...doc.data() }); });
+                // 호스트 생존 신호가 45초 이상 끊긴 방은 목록에서 숨김
+                const nowMs = serverNow();
+                const rooms = allRooms.filter(r => {
+                    const seenTs = r.hostSeen || r.createdAt;
+                    const seenMs = seenTs && seenTs.toMillis ? seenTs.toMillis() : nowMs;
+                    return nowMs - seenMs < 45000;
+                });
                 countEl.textContent = rooms.length;
                 if (rooms.length === 0) listEl.innerHTML = '<p class="text-gray-300 text-xs text-center py-4 uppercase tracking-widest">No Open Rooms</p>';
                 else {
