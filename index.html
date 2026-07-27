@@ -129,6 +129,17 @@
         .modal-content { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         
 
+        /* --- 부드러운 턴 타이머 진행바 --- */
+        .timer-bar {
+            width: 100%; height: 4px; margin-top: 6px;
+            background: #e5e7eb; border-radius: 2px; overflow: hidden;
+        }
+        .timer-bar > div {
+            height: 100%; width: 100%;
+            background: linear-gradient(90deg, #ff3333, #ffcc00, #3355ff);
+            border-radius: 2px;
+        }
+
         /* ================= MOBILE APP OPTIMIZATION ================= */
         html, body {
             overscroll-behavior: none;              /* pull-to-refresh 방지 */
@@ -240,6 +251,7 @@
                 <div id="desktop-timer-container" class="text-right hidden md:block">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TIMER</p>
                     <p class="text-5xl font-mono font-bold leading-none" id="timer-display">--</p>
+                    <div class="timer-bar"><div id="timer-bar-fill"></div></div>
                 </div>
             </div>
 
@@ -251,6 +263,7 @@
                 <div id="mobile-timer-container" class="text-right">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TURN TIMER</p>
                     <p class="text-4xl font-mono font-bold leading-none" id="timer-display-mobile">--</p>
+                    <div class="timer-bar"><div id="timer-bar-fill-mobile"></div></div>
                 </div>
             </div>
 
@@ -561,6 +574,14 @@
         let selectedCell = null; 
         let isResolving = false;
         let localTimerInterval = null;
+        let timerGeneration = 0; // 타이머 루프 중복 방지 토큰
+        function updateTimerBar(pct) {
+            const w = Math.max(0, Math.min(100, pct)) + '%';
+            const a = document.getElementById('timer-bar-fill');
+            const b = document.getElementById('timer-bar-fill-mobile');
+            if (a) a.style.width = w;
+            if (b) b.style.width = w;
+        }
         let lastTimerValue = ""; 
         let lastGameMode = null; 
         let isMoveCommitted = false; 
@@ -841,7 +862,7 @@
 
         function resetLocalStateAndUI() {
             stopQueueWatchdog();
-            if (localTimerInterval) clearInterval(localTimerInterval);
+            if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
             if (unsubscribeGame) { unsubscribeGame(); unsubscribeGame = null; }
             if (unsubscribeMyTicket) { unsubscribeMyTicket(); unsubscribeMyTicket = null; }
 
@@ -886,7 +907,7 @@
             
             unsubscribeGame = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId), (docSnap) => {
                 if(!docSnap.exists()) {
-                    if(localTimerInterval) clearInterval(localTimerInterval);
+                    if(localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
                     resetLocalStateAndUI();
                     return;
                 }
@@ -1038,7 +1059,7 @@
 
             const myPlayerData = gameData.players[userId];
             if (myPlayerData && myPlayerData.isAI) {
-                if(localTimerInterval) clearInterval(localTimerInterval);
+                if(localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
                 if(unsubscribeGame) { unsubscribeGame(); unsubscribeGame = null; }
                 resetLocalStateAndUI();
                 return; 
@@ -1068,7 +1089,7 @@
             const isNewTurn = gameData.turn > lastProcessedTurn;
 
             if (gameData.status === 'finished') {
-                if (localTimerInterval) clearInterval(localTimerInterval);
+                if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
                 updateTimerDisplay("0");
                 
                 if (!isNewTurn && !isAnimating) {
@@ -1171,17 +1192,20 @@
         }
 
         function runClientTimer(deadline, gameData) {
-            if (localTimerInterval) clearInterval(localTimerInterval);
+            if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
+            // [TIMER-FIX] 턴 시작 시점의 실제 카운트다운 길이를 기억 → 진행바 기준으로 사용
+            const turnTotalMs = Math.max(1000, (deadline - serverNow()) - NETWORK_BUFFER_MS);
             const updateTimer = () => {
-                if (isAnimating) { updateTimerDisplay("0"); return; }
+                if (isAnimating) { updateTimerDisplay("\u00b7\u00b7\u00b7"); updateTimerBar(0); return; }
                 const now = serverNow();
                 const totalDiff = deadline - now;
                 const visualDiff = totalDiff - NETWORK_BUFFER_MS;
+                updateTimerBar((visualDiff / turnTotalMs) * 100);
                 if (visualDiff <= 500 && !isMoveCommitted && selectedCell) commitCurrentMove();
                 let secondsLeft = Math.ceil(visualDiff / 1000);
                 if (secondsLeft > 0) updateTimerDisplay(secondsLeft.toString());
                 else {
-                    updateTimerDisplay("0");
+                    updateTimerDisplay("\u00b7\u00b7\u00b7");
                     // [NET-FIX 3] 호스트가 백그라운드/이탈 시 백업 해결을 계단식으로:
                     // 호스트 0ms → 다음 유저 +1.5s → 그다음 +3s (기존: 전원 일괄 3s 대기)
                     const isHost = userId === gameData.hostId;
@@ -1195,7 +1219,17 @@
                 }
             };
             updateTimer();
-            localTimerInterval = setInterval(updateTimer, 100);
+            // [TIMER-FIX] 100ms 폴링 대신 rAF: 프레임마다 갱신되어 초 전환과 진행바가 매끄러움
+            timerGeneration++;
+            const myGen = timerGeneration;
+            const rafLoop = () => {
+                if (myGen !== timerGeneration) return; // 새 타이머가 시작되면 이전 루프 종료
+                updateTimer();
+                requestAnimationFrame(rafLoop);
+            };
+            requestAnimationFrame(rafLoop);
+            // 탭이 백그라운드일 때 rAF가 멈추므로 저주기 인터벌을 보조로 유지
+            localTimerInterval = setInterval(updateTimer, 500);
         }
 
         async function commitCurrentMove() {
