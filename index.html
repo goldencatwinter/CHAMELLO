@@ -559,7 +559,7 @@
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
         import { 
             getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, 
-            query, where, getDocs, getDoc, runTransaction, serverTimestamp, orderBy, limit, deleteField 
+            query, where, getDocs, getDoc, runTransaction, serverTimestamp, orderBy, limit, deleteField, addDoc 
         } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // --- Sound Manager ---
@@ -997,6 +997,52 @@
             turn();
         }
 
+        // ================= 대기방 채팅 =================
+        let chatUnsub = null, chatMsgs = [], chatDraft = '';
+        function subscribeChat(gid) {
+            if (chatUnsub) return;
+            const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'games', gid, 'chat');
+            const q = query(chatRef, orderBy('ts', 'asc'), limit(60));
+            chatUnsub = onSnapshot(q, (snap) => {
+                chatMsgs = snap.docs.map(d => d.data());
+                renderChatMsgs();
+            }, () => {});
+        }
+        function unsubscribeChat() {
+            if (chatUnsub) { chatUnsub(); chatUnsub = null; }
+            chatMsgs = []; chatDraft = '';
+        }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function renderChatMsgs() {
+            const list = document.getElementById('wr-chat-list');
+            if (!list) return;
+            list.innerHTML = chatMsgs.map(m => {
+                const mine = m.uid === userId;
+                return `<div class="text-left mb-1"><span class="font-black uppercase ${mine ? 'text-black' : 'text-gray-500'}">${esc((m.name || 'P').slice(0, 10))}</span><span class="text-gray-700"> : ${esc(m.text || '')}</span></div>`;
+            }).join('') || '<p class="text-gray-300 text-center py-2">Say hi to your friends!</p>';
+            list.scrollTop = list.scrollHeight;
+        }
+        window.sendRoomChat = async () => {
+            const input = document.getElementById('wr-chat-input');
+            if (!input || !gameId) return;
+            const text = input.value.trim().slice(0, 200);
+            if (!text) return;
+            input.value = ''; chatDraft = '';
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'games', gameId, 'chat'), {
+                    uid: userId, name: myNickname || 'PLAYER', text, ts: serverTimestamp()
+                });
+            } catch (e) { console.warn('chat failed', e); }
+        };
+        window.roomChatKey = (e) => {
+            chatDraft = e.target.value;
+            if (e.key === 'Enter') window.sendRoomChat();
+        };
+        window.toggleMyReady = async () => {
+            if (!gameId) return;
+            try { await callFn('setReady', { gameId }); } catch (e) { console.warn(e); }
+        };
+
         // --- 대기방 호스트 하트비트 (15초마다 생존 신호 → 끊기면 방 자동 소멸) ---
         let roomHeartbeatTimer = null;
         function startRoomHeartbeat() {
@@ -1297,6 +1343,7 @@
         function resetLocalStateAndUI() {
             stopQueueWatchdog();
             stopRoomHeartbeat();
+            unsubscribeChat();
             if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
             if (unsubscribeGame) { unsubscribeGame(); unsubscribeGame = null; }
             if (unsubscribeMyTicket) { unsubscribeMyTicket(); unsubscribeMyTicket = null; }
@@ -1392,6 +1439,7 @@
         function handleGameUpdate(gameData) {
             if (gameData.status === 'waiting' && gameData.hostId === userId) startRoomHeartbeat();
             else stopRoomHeartbeat();
+            if (gameData.status !== 'waiting') unsubscribeChat();
             if (gameId && userId && !gameData.players[userId]) {
                 resetLocalStateAndUI();
                 return;
@@ -1406,6 +1454,10 @@
                     const hostId = gameData.hostId;
                     const isMeHost = (hostId === userId);
 
+                    const readyCount = Object.values(players).filter(p => p.ready).length;
+                    const allReady = readyCount === pCount;
+                    const meReady = !!(players[userId] && players[userId].ready);
+
                     let playerListHTML = '';
                     gameData.playerOrder.forEach((pid, idx) => {
                         const p = players[pid];
@@ -1419,45 +1471,62 @@
                                         <span class="font-bold text-sm uppercase ${isMe ? 'underline' : ''}">${p.nickname}</span>
                                         ${pid === hostId ? '<span class="text-[10px] bg-yellow-400 text-black px-1 rounded font-bold shadow-sm">HOST</span>' : ''}
                                     </div>
-                                    ${canKick ? `<button onclick="window.kickPlayerFromRoom('${pid}')" class="bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase shadow-md hover:scale-105 transition-transform">KICK</button>` : ''}
+                                    <div class="flex items-center gap-2">
+                                        ${p.ready
+                                            ? '<span class="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded font-black tracking-widest">READY</span>'
+                                            : '<span class="text-[10px] text-gray-400 font-bold tracking-widest">WAITING</span>'}
+                                        ${canKick ? `<button onclick="window.kickPlayerFromRoom('${pid}')" class="bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase shadow-md hover:scale-105 transition-transform">KICK</button>` : ''}
+                                    </div>
                                 </div>
                             `;
                         }
                     });
 
-                    // [MODIFIED] Button UI Logic (Text-only Rainbow Gradient)
-                    let actionHTML = '';
+                    // 레디 버튼 (호스트 포함 전원) + 조건 충족 시 호스트에게 시작 버튼
+                    const readyBtnHTML = `
+                        <button onclick="window.toggleMyReady()"
+                            class="mt-3 px-8 py-2.5 font-black text-sm tracking-[0.2em] uppercase transition-all border-2
+                            ${meReady ? 'bg-green-500 border-green-500 text-white hover:bg-green-600' : 'bg-white border-black text-black hover:bg-black hover:text-white animate-pulse'}">
+                            ${meReady ? '\u2713 READY' : 'READY?'}
+                        </button>`;
+
+                    let actionHTML = readyBtnHTML;
                     if (isMeHost) {
-                         if (pCount === 3) {
-                             // 3명일 때: START GAME (배경없음, 텍스트 무지개)
-                             actionHTML = `
-                                <button onclick="window.hostStartGame()" 
-                                    class="mt-6 btn-text-rainbow text-4xl md:text-5xl py-4 px-8 tracking-widest w-full hover:scale-110 transition-transform font-black">
+                        if (allReady && pCount === 3) {
+                            actionHTML += `
+                                <button onclick="window.hostStartGame()"
+                                    class="mt-4 btn-text-rainbow text-4xl md:text-5xl py-3 px-8 tracking-widest w-full hover:scale-110 transition-transform font-black">
                                     START GAME
                                 </button>`;
-                         } else if (pCount === 2) {
-                             // 2명일 때: START + AI (배경없음, 텍스트 무지개)
-                             actionHTML = `
-                                <div class="flex flex-col items-center gap-2 mt-4 w-full">
-                                    <button onclick="window.hostStartGameWithAI()" 
-                                        class="btn-text-rainbow text-3xl md:text-4xl py-4 px-8 tracking-widest w-full hover:scale-110 transition-transform font-black">
-                                        START + AI (2P)
+                        } else if (allReady && pCount >= 1 && pCount < 3) {
+                            actionHTML += `
+                                <div class="flex flex-col items-center gap-1 mt-4 w-full">
+                                    <button onclick="window.hostStartGameWithAI()"
+                                        class="btn-text-rainbow text-3xl md:text-4xl py-3 px-8 tracking-widest w-full hover:scale-110 transition-transform font-black">
+                                        START + AI (${3 - pCount})
                                     </button>
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Waiting for 3rd player...</p>
-                                </div>
-                             `;
-                         } else {
-                             // 1명일 때
-                             actionHTML = `<p class="mt-8 text-xs font-bold text-gray-400 uppercase tracking-widest animate-pulse">Waiting for players (1/3)...</p>`;
-                         }
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Or wait for more players (${pCount}/3)</p>
+                                </div>`;
+                        } else {
+                            actionHTML += `<p class="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">Waiting for everyone to ready up (${readyCount}/${pCount})</p>`;
+                        }
                     } else {
-                        actionHTML = `
-                            <div class="mt-6 flex flex-col items-center gap-2">
-                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
-                                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Waiting for host to start...</p>
-                            </div>
-                        `;
+                        actionHTML += `<p class="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">${allReady ? 'Waiting for host to start...' : `Ready: ${readyCount}/${pCount}`}</p>`;
                     }
+
+                    // 방 채팅
+                    const chatHTML = `
+                        <div class="w-full max-w-xs mt-4 border-t-2 border-black/10 pt-3">
+                            <div id="wr-chat-list" class="h-24 overflow-y-auto text-[11px] leading-relaxed mb-2 px-1 bg-white/60 rounded p-2"></div>
+                            <div class="flex gap-1.5">
+                                <input id="wr-chat-input" type="text" maxlength="200" placeholder="Chat with your room..."
+                                    onkeyup="window.roomChatKey(event)"
+                                    class="flex-1 bg-white border-2 border-gray-200 focus:border-black px-2 py-1.5 text-xs font-bold focus:outline-none">
+                                <button onclick="window.sendRoomChat()"
+                                    class="bg-black text-white text-[10px] font-black px-3 uppercase tracking-widest hover:bg-gray-800">Send</button>
+                            </div>
+                        </div>`;
+                    actionHTML += chatHTML;
 
                     waitingEl.innerHTML = `
                         <div class="flex flex-col items-center justify-center text-center w-full p-6 h-full">
@@ -1467,6 +1536,10 @@
                             </div>
                             ${actionHTML}
                         </div>`;
+                    subscribeChat(gameId);
+                    renderChatMsgs();
+                    const ci = document.getElementById('wr-chat-input');
+                    if (ci && chatDraft) ci.value = chatDraft;
                 }
                 
                 const myData = gameData.players[userId];
