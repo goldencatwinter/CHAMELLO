@@ -243,12 +243,16 @@
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-2 md:p-8" onclick="window.SoundManager && SoundManager.init()">
 
-    <div id="message-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-[2px] bg-black/30">
-        <div class="modal-content bg-white/20 border border-white/40 p-6 w-[80%] max-w-sm text-center backdrop-blur-md shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] rounded-xl relative">
+    <div id="message-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center pointer-events-none">
+        <div class="modal-content pointer-events-auto bg-black/70 border border-white/40 p-6 w-[80%] max-w-sm text-center backdrop-blur-md shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] rounded-xl relative">
             <button onclick="document.getElementById('message-modal').classList.add('hidden')" class="absolute top-2 right-3 text-white text-2xl font-bold p-1 leading-none hover:text-gray-300">&times;</button>
             
             <h3 id="modal-title" class="text-2xl font-black uppercase mb-3 tracking-tighter text-white drop-shadow-md">TITLE</h3>
-            <p id="modal-content" class="text-white mb-6 font-bold whitespace-pre-line leading-relaxed text-sm drop-shadow-sm">Content</p>
+            <p id="modal-content" class="text-white mb-4 font-bold whitespace-pre-line leading-relaxed text-sm drop-shadow-sm">Content</p>
+            <div id="modal-hearts" class="hidden mb-5">
+                <p class="text-[9px] font-black text-white/50 uppercase tracking-[0.25em] mb-2">Send a heart</p>
+                <div id="modal-hearts-row" class="flex justify-center gap-5"></div>
+            </div>
             
             <div class="flex flex-col gap-2 w-full">
                 <button id="modal-play-again" class="w-full bg-black hover:bg-gray-800 text-white border border-white/20 font-black py-4 text-sm tracking-[0.2em] uppercase transition-all hover:scale-105 rounded-lg shadow-xl">
@@ -308,6 +312,22 @@
             <line x1="21" y1="9" x2="15" y2="15"/>
         </svg>
     </button>
+
+    <!-- 모바일 채팅: 상단 메시지 오버레이 -->
+    <div id="mob-chat-feed" class="md:hidden fixed left-2 right-2 z-[82] flex flex-col gap-1 pointer-events-none"
+         style="display:none; top: calc(env(safe-area-inset-top) + 8px);"></div>
+
+    <!-- 모바일 채팅: 입력 오버레이 (키보드 위에 뜸) -->
+    <div id="mob-chat-wrap" class="hidden fixed inset-x-0 bottom-0 z-[97] bg-black/90 p-2 flex gap-2"
+         style="padding-bottom: calc(env(safe-area-inset-bottom) + 8px);">
+        <input id="mob-chat-input" type="text" maxlength="200" placeholder="Message..."
+               onkeyup="window.roomChatKey(event)"
+               class="flex-1 bg-white text-black placeholder:text-gray-400 caret-black px-3 py-2.5 text-sm font-bold focus:outline-none rounded">
+        <button onclick="window.sendRoomChat('mob-chat-input')"
+                class="bg-white text-black text-[11px] font-black px-4 uppercase tracking-widest rounded active:scale-95">Send</button>
+        <button onclick="window.closeMobChat()"
+                class="text-white/60 text-xl font-bold px-2 leading-none">&times;</button>
+    </div>
 
     <div id="account-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center backdrop-blur-sm bg-black/40 p-4">
         <div class="modal-content bg-white p-6 w-full max-w-sm shadow-2xl border-2 border-black text-center">
@@ -396,6 +416,10 @@
                         <p class="text-[9px] md:text-[11px] font-bold text-gray-400 uppercase tracking-[0.22em] mt-1.5 pl-0.5">Tri-Color Territory Battle</p>
                     </div>
                     <div id="title-cham" class="chamello-icon cham-mask shrink-0 self-center" ondblclick="window.openRanks()" title="Double-click: Rank Chart"></div>
+                    <button id="mob-chat-btn" onclick="window.openMobChat()" style="display:none"
+                            class="md:!hidden self-center ml-1 w-9 h-9 flex items-center justify-center bg-black text-white rounded-full shadow-md active:scale-90 transition-transform">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8.4L4.7 20.7A1 1 0 0 1 3 20V5a1 1 0 0 1 1-1z"/></svg>
+                    </button>
                 </div>
                 <div id="desktop-timer-container" class="text-right hidden md:block">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TIMER</p>
@@ -540,7 +564,10 @@
                         </div>
                     </div>
                     <div class="flex items-end justify-between mb-3">
-                        <span id="record-name" class="text-sm font-black uppercase truncate mr-2">-</span>
+                        <div class="flex items-center gap-2 min-w-0 mr-2">
+                            <span id="record-name" class="text-sm font-black uppercase truncate">-</span>
+                            <span id="rec-hearts" class="text-[11px] font-black text-rose-500 shrink-0">\u2665 0</span>
+                        </div>
                         <div class="text-right shrink-0">
                             <span id="record-rate" class="text-3xl font-black leading-none">--%</span>
                             <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Win Rate</p>
@@ -1195,6 +1222,7 @@
                 const list = document.getElementById(id);
                 if (list) { list.innerHTML = html; list.scrollTop = list.scrollHeight; }
             });
+            renderMobFeed();
         }
         window.sendRoomChat = async (srcId) => {
             const input = document.getElementById(srcId || 'wr-chat-input');
@@ -1202,9 +1230,13 @@
             const text = input.value.trim().slice(0, 200);
             if (!text) return;
             input.value = ''; chatDraft = '';
+            if ((srcId || '') === 'mob-chat-input') window.closeMobChat(); // 다 쓰고 보내면 사라짐
             try {
                 await callFn('sendChat', { gameId, text }); // 서버가 멤버십 검증 후 기록
-            } catch (e) { console.warn('chat failed', e); }
+            } catch (e) {
+                console.warn('chat failed', e);
+                input.value = text; // 실패 시 내용 복원해 사용자가 알 수 있게
+            }
         };
         window.roomChatKey = (e) => {
             chatDraft = e.target.value;
@@ -1217,6 +1249,36 @@
             resetLocalStateAndUI();
             try { await callFn('leaveRoom', { gameId: gid }); } catch (e) { console.warn(e); }
         };
+        // --- 모바일 오버레이 채팅 ---
+        window.openMobChat = () => {
+            const w = document.getElementById('mob-chat-wrap');
+            w.classList.remove('hidden');
+            const inp = document.getElementById('mob-chat-input');
+            setTimeout(() => inp.focus(), 50);
+        };
+        window.closeMobChat = () => {
+            const w = document.getElementById('mob-chat-wrap');
+            w.classList.add('hidden');
+            const inp = document.getElementById('mob-chat-input');
+            if (inp) inp.blur();
+        };
+        function setMobChatVisible(on) {
+            const btn = document.getElementById('mob-chat-btn');
+            const feed = document.getElementById('mob-chat-feed');
+            if (btn) btn.style.display = on ? 'flex' : 'none';
+            if (feed) feed.style.display = on ? 'flex' : 'none';
+            if (!on) { window.closeMobChat(); if (feed) feed.innerHTML = ''; }
+        }
+        function renderMobFeed() {
+            const feed = document.getElementById('mob-chat-feed');
+            if (!feed || feed.style.display === 'none') return;
+            feed.innerHTML = chatMsgs.slice(-3).map(m => {
+                const mine = m.uid === userId;
+                return `<div class="self-start max-w-[85%] bg-black/75 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow">` +
+                    `<span class="${mine ? 'text-yellow-300' : 'text-white/60'}">${esc((m.name || 'P').slice(0, 10))}</span> ` +
+                    `<span>${esc(m.text || '')}</span></div>`;
+            }).join('');
+        }
         window.toggleMyReady = async () => {
             if (!gameId) return;
             try { await callFn('setReady', { gameId }); } catch (e) { console.warn(e); }
@@ -1523,6 +1585,7 @@
             stopQueueWatchdog();
             stopRoomHeartbeat();
             unsubscribeChat();
+            setMobChatVisible(false);
             if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
             if (unsubscribeGame) { unsubscribeGame(); unsubscribeGame = null; }
             if (unsubscribeMyTicket) { unsubscribeMyTicket(); unsubscribeMyTicket = null; }
@@ -1624,6 +1687,7 @@
                 const humanCount = Object.values(gameData.players).filter(p => !p.isAI).length;
                 const showGC = gameData.status !== 'waiting' && humanCount >= 2;
                 gcSec.classList.toggle('hidden', !showGC);
+                setMobChatVisible(showGC);
                 if (showGC) subscribeChat(gameId);
             }
             // 게임 중에도 채팅 유지 (구독은 로비 복귀 시에만 해제)
@@ -1917,14 +1981,18 @@
             if (localTimerInterval) clearInterval(localTimerInterval); timerGeneration++;
             // [TIMER-FIX] 턴 시작 시점의 실제 카운트다운 길이를 기억 → 진행바 기준으로 사용
             const turnTotalMs = Math.max(1000, (deadline - serverNow()) - NETWORK_BUFFER_MS);
+            // [표시 캡+지연] 6/11 방지 + 5와 10이 1초 더 머물다 카운트 시작
+            const capSec = (gameData && gameData.turn === 1) ? 10 : 5;
+            const DISPLAY_SHIFT_MS = 1000;
             const updateTimer = () => {
                 if (isAnimating) { updateTimerDisplay("\u00b7\u00b7\u00b7"); updateTimerBar(0); return; }
                 const now = serverNow();
                 const totalDiff = deadline - now;
                 const visualDiff = totalDiff - NETWORK_BUFFER_MS;
-                updateTimerBar((visualDiff / turnTotalMs) * 100);
+                const dispDiff = visualDiff + DISPLAY_SHIFT_MS;
+                updateTimerBar((dispDiff / (turnTotalMs + DISPLAY_SHIFT_MS)) * 100);
                 if (visualDiff <= 500 && !isMoveCommitted && selectedCell) commitCurrentMove();
-                let secondsLeft = Math.ceil(visualDiff / 1000);
+                let secondsLeft = Math.min(capSec, Math.ceil(dispDiff / 1000));
                 if (secondsLeft > 0) updateTimerDisplay(secondsLeft.toString());
                 else {
                     updateTimerDisplay("\u00b7\u00b7\u00b7");
@@ -2188,6 +2256,24 @@
                  content = `WINNER: ${winner.nickname} (${winner.score})\nYOUR SCORE: ${myScore}`;
              }
              if (myAccountName) setTimeout(loadMyRecord, 1500);
+             // 좋아요: AI가 아닌 상대들에게 하트 보내기
+             const heartsWrap = document.getElementById('modal-hearts');
+             const heartsRow = document.getElementById('modal-hearts-row');
+             const others = Object.entries(players).filter(([pid, p]) => pid !== userId && !p.isAI);
+             if (others.length && players[userId]) {
+                 heartsRow.innerHTML = others.map(([pid, p]) => `
+                     <button id="heart-${pid}" onclick="window.sendHeartTo('${pid}')"
+                             class="flex flex-col items-center gap-1 group">
+                         <svg width="30" height="30" viewBox="0 0 24 24" class="heart-svg transition-transform group-active:scale-90"
+                              fill="none" stroke="white" stroke-width="2" stroke-linejoin="round">
+                             <path d="M12 21s-7.5-4.9-10-9.2C.4 8.6 2.2 4.9 5.8 4.3c2-.3 4 .6 6.2 3 2.2-2.4 4.2-3.3 6.2-3 3.6.6 5.4 4.3 3.8 7.5C19.5 16.1 12 21 12 21z"/>
+                         </svg>
+                         <span class="text-[9px] font-black text-white/70 uppercase max-w-[64px] truncate">${p.nickname}</span>
+                     </button>`).join('');
+                 heartsWrap.classList.remove('hidden');
+             } else {
+                 heartsWrap.classList.add('hidden');
+             }
              document.getElementById('modal-title').textContent = title;
              document.getElementById('modal-content').textContent = content;
              
@@ -2196,6 +2282,23 @@
              modal.classList.remove('hidden');
         }
 
+        window.sendHeartTo = async (toUid) => {
+            const btn = document.getElementById('heart-' + toUid);
+            if (!btn || btn.disabled || !gameId) return;
+            btn.disabled = true;
+            const svg = btn.querySelector('.heart-svg');
+            try {
+                await callFn('sendHeart', { gameId, toUid });
+                if (svg) {
+                    svg.setAttribute('fill', '#ff3355');
+                    svg.setAttribute('stroke', '#ff3355');
+                    svg.animate([
+                        { transform: 'scale(1)' }, { transform: 'scale(1.45)', offset: 0.4 }, { transform: 'scale(1)' }
+                    ], { duration: 350, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+                }
+                if (window.SoundManager && window.SoundManager.ctx) window.SoundManager.playClick();
+            } catch (e) { btn.disabled = false; console.warn('heart failed', e); }
+        };
         window.triggerRematch = async () => {
              document.getElementById('message-modal').classList.add('hidden');
              if (!gameId) return;
@@ -2505,6 +2608,7 @@
                 document.getElementById('rec-w').textContent = w;
                 document.getElementById('rec-l').textContent = l;
                 document.getElementById('rec-d').textContent = dr;
+                document.getElementById('rec-hearts').textContent = '\u2665 ' + (s.hearts || 0);
                 applyRankUI(pts);
             } catch (e) { console.warn("Record load failed:", e); }
         }
