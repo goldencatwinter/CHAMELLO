@@ -185,6 +185,10 @@
         }
         input, textarea { -webkit-user-select: text; user-select: text; }
 
+        /* 모든 버튼 · 방 목록: 누르는 순간 살짝 눌림 */
+        button, .press-item { transition: transform 0.06s ease-out; }
+        button:active, .press-item:active { transform: scale(0.95); }
+
         /* 보드 확대/제스처 완전 차단 + 쫀득한 탭 피드백 */
         #game-board, #game-board .cell {
             touch-action: none;
@@ -655,6 +659,18 @@
                 gain.connect(this.master);
                 osc.start(t); osc.stop(t + 0.5);
             },
+            playClick: function() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const o = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                o.type = 'triangle'; o.frequency.setValueAtTime(1400, t);
+                o.frequency.exponentialRampToValueAtTime(900, t + 0.05);
+                g.gain.setValueAtTime(0.07, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+                o.connect(g); g.connect(this.master);
+                o.start(t); o.stop(t + 0.08);
+            },
             playTick: function() {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
@@ -688,6 +704,13 @@
             btn.classList.toggle('text-gray-300', s.muted);
             btn.classList.toggle('text-gray-700', !s.muted);
         };
+        // 모든 버튼·방 목록 클릭에 소리 (위임 — 동적으로 생긴 요소도 포함)
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.closest && e.target.closest('button, .press-item')) {
+                if (window.SoundManager && window.SoundManager.ctx) window.SoundManager.playClick();
+            }
+        }, true);
+
         // iOS 핀치 확대·더블탭 확대 원천 차단 (게임판 늘어남 방지)
         document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
         document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
@@ -998,19 +1021,22 @@
         }
 
         // ================= 대기방 채팅 =================
-        let chatUnsub = null, chatMsgs = [], chatDraft = '';
+        let chatUnsub = null, chatMsgs = [], chatDraft = '', chatJoinMs = 0;
+        let lastWaitingSig = '';
         function subscribeChat(gid) {
             if (chatUnsub) return;
+            chatJoinMs = serverNow() - 1500; // 내가 입장한 시점 이후 채팅만 표시
             const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'games', gid, 'chat');
             const q = query(chatRef, orderBy('ts', 'asc'), limit(60));
             chatUnsub = onSnapshot(q, (snap) => {
-                chatMsgs = snap.docs.map(d => d.data());
+                chatMsgs = snap.docs.map(d => d.data())
+                    .filter(m => !m.ts || m.ts.toMillis() >= chatJoinMs);
                 renderChatMsgs();
             }, () => {});
         }
         function unsubscribeChat() {
             if (chatUnsub) { chatUnsub(); chatUnsub = null; }
-            chatMsgs = []; chatDraft = '';
+            chatMsgs = []; chatDraft = ''; lastWaitingSig = '';
         }
         function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         function renderChatMsgs() {
@@ -1029,14 +1055,19 @@
             if (!text) return;
             input.value = ''; chatDraft = '';
             try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'games', gameId, 'chat'), {
-                    uid: userId, name: myNickname || 'PLAYER', text, ts: serverTimestamp()
-                });
+                await callFn('sendChat', { gameId, text }); // 서버가 멤버십 검증 후 기록
             } catch (e) { console.warn('chat failed', e); }
         };
         window.roomChatKey = (e) => {
             chatDraft = e.target.value;
             if (e.key === 'Enter') window.sendRoomChat();
+        };
+        window.leaveRoomNow = async () => {
+            if (!gameId) return;
+            const gid = gameId;
+            if (unsubscribeGame) { unsubscribeGame(); unsubscribeGame = null; } // 재흡입 방지
+            resetLocalStateAndUI();
+            try { await callFn('leaveRoom', { gameId: gid }); } catch (e) { console.warn(e); }
         };
         window.toggleMyReady = async () => {
             if (!gameId) return;
@@ -1453,6 +1484,11 @@
                     const pCount = Object.keys(players).length;
                     const hostId = gameData.hostId;
                     const isMeHost = (hostId === userId);
+                    // [채팅버그 수정] 하트비트 같은 무의미한 갱신엔 리렌더 생략 → 입력칸이 파괴되지 않음
+                    const wrSig = JSON.stringify([rName, hostId, gameData.playerOrder,
+                        Object.entries(players).map(([k, p]) => [k, p.nickname, !!p.ready, p.color])]);
+                    const needRebuild = wrSig !== lastWaitingSig;
+                    lastWaitingSig = wrSig;
 
                     const readyCount = Object.values(players).filter(p => p.ready).length;
                     const allReady = readyCount === pCount;
@@ -1514,6 +1550,13 @@
                         actionHTML += `<p class="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">${allReady ? 'Waiting for host to start...' : `Ready: ${readyCount}/${pCount}`}</p>`;
                     }
 
+                    // 방 나가기
+                    const leaveHTML = `
+                        <button onclick="window.leaveRoomNow()"
+                            class="mt-3 text-[10px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-[0.2em] underline underline-offset-2 transition-colors">
+                            ${isMeHost ? 'Close Room' : 'Leave Room'}
+                        </button>`;
+
                     // 방 채팅
                     const chatHTML = `
                         <div class="w-full max-w-xs mt-4 border-t-2 border-black/10 pt-3">
@@ -1526,9 +1569,14 @@
                                     class="bg-black text-white text-[10px] font-black px-3 uppercase tracking-widest hover:bg-gray-800">Send</button>
                             </div>
                         </div>`;
-                    actionHTML += chatHTML;
+                    actionHTML += chatHTML + leaveHTML;
 
-                    waitingEl.innerHTML = `
+                    if (needRebuild) {
+                        // 리렌더 직전 입력 상태(내용+포커스) 보존 → 복원
+                        const prevIn = document.getElementById('wr-chat-input');
+                        const hadFocus = prevIn && document.activeElement === prevIn;
+                        const draftVal = prevIn ? prevIn.value : chatDraft;
+                        waitingEl.innerHTML = `
                         <div class="flex flex-col items-center justify-center text-center w-full p-6 h-full">
                             <h2 class="text-4xl font-black uppercase mb-8 title-rainbow drop-shadow-md tracking-tighter">${rName}</h2>
                             <div class="w-full flex flex-col items-center gap-1 mb-4">
@@ -1536,10 +1584,14 @@
                             </div>
                             ${actionHTML}
                         </div>`;
+                        renderChatMsgs();
+                        const ci = document.getElementById('wr-chat-input');
+                        if (ci) {
+                            ci.value = draftVal || '';
+                            if (hadFocus) { ci.focus(); try { ci.setSelectionRange(ci.value.length, ci.value.length); } catch (e) {} }
+                        }
+                    }
                     subscribeChat(gameId);
-                    renderChatMsgs();
-                    const ci = document.getElementById('wr-chat-input');
-                    if (ci && chatDraft) ci.value = chatDraft;
                 }
                 
                 const myData = gameData.players[userId];
@@ -1897,7 +1949,7 @@
                         const isMyRoom = (room.players[userId] !== undefined);
                         const rName = room.roomName || 'Room';
                         const el = document.createElement('div');
-                        el.className = "flex justify-between items-center p-3 border border-blue-100 bg-blue-50/50 mb-2 rounded hover:bg-blue-100 transition-colors cursor-pointer";
+                        el.className = "press-item flex justify-between items-center p-3 border border-blue-100 bg-blue-50/50 mb-2 rounded hover:bg-blue-100 cursor-pointer select-none";
                         el.onclick = () => joinOpenGame(room.id);
                         if (isMyRoom) el.className += " border-blue-500 ring-1 ring-blue-500";
                         el.innerHTML = `<div><div class="text-sm font-black uppercase text-blue-700 leading-tight mb-0.5">${rName}</div><div class="text-[10px] text-gray-500 font-bold uppercase">HOST: ${hostName}</div></div><div class="flex flex-col items-end gap-1"><span class="text-lg font-black text-blue-600">${pCount}/3</span><span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded font-bold uppercase">JOIN</span></div>`;
