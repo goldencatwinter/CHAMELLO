@@ -314,8 +314,8 @@
     </button>
 
     <!-- 모바일 채팅: 상단 메시지 오버레이 -->
-    <div id="mob-chat-feed" class="md:hidden fixed left-2 right-2 z-[82] flex flex-col gap-1 pointer-events-none"
-         style="display:none; top: calc(env(safe-area-inset-top) + 8px);"></div>
+    <div id="mob-chat-feed" class="md:hidden fixed left-2 right-2 z-[82] flex flex-col gap-1 pointer-events-none select-none"
+         style="display:none; top: calc(env(safe-area-inset-top) + 8px); max-height: 35vh; overflow: hidden;"></div>
 
     <!-- 모바일 채팅: 입력 오버레이 (키보드 위에 뜸) -->
     <div id="mob-chat-wrap" class="hidden fixed inset-x-0 bottom-0 z-[97] bg-black/90 p-2 flex gap-2"
@@ -1203,7 +1203,11 @@
                 }
                 // 이후 새로 추가된 메시지만 누적 → 보낸 사람 본인에게도 즉시 보임
                 snap.docChanges().forEach(ch => {
-                    if (ch.type === 'added') chatMsgs.push(ch.doc.data());
+                    if (ch.type === 'added') {
+                        const m = ch.doc.data();
+                        chatMsgs.push(m);
+                        mobFeedPush(m); // 모바일 자막
+                    }
                 });
                 renderChatMsgs();
             }, () => {});
@@ -1222,7 +1226,6 @@
                 const list = document.getElementById(id);
                 if (list) { list.innerHTML = html; list.scrollTop = list.scrollHeight; }
             });
-            renderMobFeed();
         }
         window.sendRoomChat = async (srcId) => {
             const input = document.getElementById(srcId || 'wr-chat-input');
@@ -1269,15 +1272,27 @@
             if (feed) feed.style.display = on ? 'flex' : 'none';
             if (!on) { window.closeMobChat(); if (feed) feed.innerHTML = ''; }
         }
-        function renderMobFeed() {
+        // 자막 스타일: 배경 없이 글씨만, 등장 → 5초 → 서서히 사라짐
+        function mobFeedPush(m) {
             const feed = document.getElementById('mob-chat-feed');
             if (!feed || feed.style.display === 'none') return;
-            feed.innerHTML = chatMsgs.slice(-3).map(m => {
-                const mine = m.uid === userId;
-                return `<div class="self-start max-w-[85%] bg-black/75 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow">` +
-                    `<span class="${mine ? 'text-yellow-300' : 'text-white/60'}">${esc((m.name || 'P').slice(0, 10))}</span> ` +
-                    `<span>${esc(m.text || '')}</span></div>`;
-            }).join('');
+            while (feed.children.length >= 4) feed.firstChild.remove(); // 최대 4줄
+            const mine = m.uid === userId;
+            const el = document.createElement('div');
+            el.className = 'self-start max-w-[90%] text-[12.5px] font-black leading-snug pointer-events-none select-none';
+            el.style.textShadow = '0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.55)';
+            el.style.pointerEvents = 'none';
+            el.innerHTML = `<span class="${mine ? 'text-yellow-300' : 'text-white/75'}">${esc((m.name || 'P').slice(0, 10))}</span> ` +
+                `<span class="text-white">${esc(m.text || '')}</span>`;
+            feed.appendChild(el);
+            el.animate([
+                { opacity: 0, transform: 'translateY(-6px)' },
+                { opacity: 1, transform: 'translateY(0)' }
+            ], { duration: 250, easing: 'ease-out' });
+            setTimeout(() => {
+                const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, easing: 'ease-in' });
+                fade.finished.then(() => el.remove()).catch(() => el.remove());
+            }, 4100); // 표시 ~5초 후 페이드
         }
         window.toggleMyReady = async () => {
             if (!gameId) return;
@@ -1983,14 +1998,15 @@
             const turnTotalMs = Math.max(1000, (deadline - serverNow()) - NETWORK_BUFFER_MS);
             // [표시 캡+지연] 6/11 방지 + 5와 10이 1초 더 머물다 카운트 시작
             const capSec = (gameData && gameData.turn === 1) ? 10 : 5;
-            const DISPLAY_SHIFT_MS = 1000;
+            const DISPLAY_SHIFT_MS = 500;
             const updateTimer = () => {
                 if (isAnimating) { updateTimerDisplay("\u00b7\u00b7\u00b7"); updateTimerBar(0); return; }
                 const now = serverNow();
                 const totalDiff = deadline - now;
                 const visualDiff = totalDiff - NETWORK_BUFFER_MS;
                 const dispDiff = visualDiff + DISPLAY_SHIFT_MS;
-                updateTimerBar((dispDiff / (turnTotalMs + DISPLAY_SHIFT_MS)) * 100);
+                // 게이지는 턴 종류와 무관하게 항상 5초 기준: 첫 턴엔 5초 남을 때까지 가득 → 이후 동일 속도로 감소
+                updateTimerBar((dispDiff / (5000 + DISPLAY_SHIFT_MS)) * 100);
                 if (visualDiff <= 500 && !isMoveCommitted && selectedCell) commitCurrentMove();
                 let secondsLeft = Math.min(capSec, Math.ceil(dispDiff / 1000));
                 if (secondsLeft > 0) updateTimerDisplay(secondsLeft.toString());
