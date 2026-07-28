@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#f0f0f0">
     <title>CHAMELLO</title>
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
     <link rel="icon" type="image/png" href="data:image/png;base64,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">
     <link rel="apple-touch-icon" href="data:image/png;base64,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">
     
@@ -211,6 +212,47 @@
         }
         .discord-btn:hover svg, .discord-btn:active svg {
             color: #5865F2; animation: none; filter: none;
+        }
+
+        /* [CG-SDK] 크레이지게임즈 설정에서 채팅 비활성화 시 모든 채팅 UI 숨김 */
+        body.cg-chat-disabled #mob-chat-btn,
+        body.cg-chat-disabled #mob-chat-wrap,
+        body.cg-chat-disabled #mob-chat-feed,
+        body.cg-chat-disabled #wr-chat-list,
+        body.cg-chat-disabled #wr-chat-input,
+        body.cg-chat-disabled #gc-list,
+        body.cg-chat-disabled #gc-input,
+        body.cg-chat-disabled #game-chat-section,
+        body.cg-chat-disabled button[onclick*="sendRoomChat"] { display: none !important; }
+
+        /* [CG-SDK] 크레이지게임즈 내에서는 자체/외부 로그인 UI 숨김 (게스트 플레이 전용) */
+        body.cg-platform button[onclick="window.openAccount()"],
+        body.cg-platform #account-btn { display: none !important; }
+
+        /* [CG-SDK] 크레이지게임즈 버전: Play as Guest를 메인 버튼으로 승격 (최상단, How to Play 위) */
+        body.cg-platform #guest-link {
+            order: -1;
+            align-self: stretch;
+            width: 100%;
+            background: #000;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 900;
+            font-size: 0.875rem;
+            padding: 1rem 0;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.15);
+            transition: background-color 0.15s ease;
+        }
+        body.cg-platform #guest-link:hover { background: #1f2937; color: #fff; }
+
+        /* [CG-SDK] 크레이지게임즈 프레임에 맞춰 게임 전체 자동 축소 시 */
+        body.cg-scaled {
+            overflow: hidden !important;
+            height: 100vh;
+            justify-content: flex-start !important;
+            padding: 0 !important;
         }
 
         /* --- 부드러운 턴 타이머 진행바 --- */
@@ -461,7 +503,7 @@
             <div class="mb-6 flex justify-between items-end">
                 <div class="flex items-center gap-3 md:gap-4">
                     <div>
-                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter title-rainbow leading-none">CHAMELLO</h1>
+                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter title-rainbow leading-none" ondblclick="location.reload()" title="Double-click: Restart" style="cursor:pointer; user-select:none; -webkit-user-select:none;">CHAMELLO</h1>
                         <p class="text-[9px] md:text-[11px] font-bold text-gray-400 uppercase tracking-[0.22em] mt-1.5 pl-0.5">Tri-Color Territory Battle</p>
                     </div>
                     <div id="title-cham" class="chamello-icon cham-mask shrink-0 self-center" ondblclick="window.openRanks()" title="Double-click: Rank Chart"></div>
@@ -653,7 +695,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, linkWithCredential, EmailAuthProvider, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, linkWithCredential, EmailAuthProvider, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
         import { 
             getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, 
@@ -1011,12 +1053,190 @@
             }
         }
         async function callFn(name, data) {
-            glowStart();
+            // 모바일(터치)에서 말 놓기(submitMove)는 로딩 카멜레온 표시 안 함 — 잦은 호출이라 시각적 소음 방지
+            const skipGlow = name === 'submitMove' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+            if (!skipGlow) glowStart();
             try {
                 const res = await httpsCallable(fns, name)(data || {});
                 return res.data;
-            } finally { glowEnd(); }
+            } finally { if (!skipGlow) glowEnd(); }
         }
+
+        // --- [CG-SDK] CrazyGames SDK 연동 (플랫폼 밖에서는 자동으로 비활성) ---
+        // [FREEZE-FIX] 게임 중 화면 꺼짐 방지 + 백그라운드 복귀 시 즉시 재동기화
+        let screenWakeLock = null;
+        async function acquireWakeLock() {
+            try {
+                if ('wakeLock' in navigator && !screenWakeLock) {
+                    screenWakeLock = await navigator.wakeLock.request('screen');
+                    screenWakeLock.addEventListener('release', () => { screenWakeLock = null; });
+                }
+            } catch (e) {}
+        }
+        function releaseWakeLock() {
+            try { if (screenWakeLock) { screenWakeLock.release(); screenWakeLock = null; } } catch (e) {}
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                try { syncServerClock(); } catch (e) {}
+                if (gameId) acquireWakeLock(); // 게임 중이었다면 다시 잠금
+            }
+        });
+
+        const CG = {
+            ready: false, lastRoomId: null, playing: false,
+            async init() {
+                try {
+                    if (!window.CrazyGames || !window.CrazyGames.SDK) return;
+                    await window.CrazyGames.SDK.init();
+                    this.ready = true;
+                    document.body.classList.add('cg-platform'); // 자체 로그인 UI 숨김 (게스트 전용)
+                    this.watchViewport(); // 프레임 크기에 맞춰 자동 축소
+                    const g = window.CrazyGames.SDK.game;
+                    this.applySettings(g.settings);
+                    // QA/로컬: 게임 URL 파라미터로도 설정 강제 가능
+                    try {
+                        const qs = new URLSearchParams(location.search);
+                        if (qs.get('disableChat') === 'true') this.applySettings({ disableChat: true });
+                        if (qs.get('muteAudio') === 'true') this.applySettings({ muteAudio: true });
+                    } catch (e) {}
+                    try { g.addSettingsChangeListener((s) => this.applySettings(s)); } catch (e) {}
+                    // 게임 실행 중 친구 초대 수락 → 즉시 해당 방으로
+                    try { g.addJoinRoomListener((p) => { if (p && p.roomId) cgAutoJoin(String(p.roomId)); }); } catch (e) {}
+                } catch (e) { console.warn('CG SDK init failed', e); }
+            },
+            applySettings(s) {
+                if (!s) return;
+                if (typeof s.disableChat !== 'undefined') {
+                    window.CG_CHAT_DISABLED = !!s.disableChat;
+                    document.body.classList.toggle('cg-chat-disabled', !!s.disableChat);
+                }
+                if (typeof s.muteAudio !== 'undefined' && s.muteAudio && window.SoundManager) {
+                    window.SoundManager.muted = true;
+                    if (window.SoundManager.master) window.SoundManager.master.gain.value = 0;
+                }
+                console.log('[CG] settings applied:', JSON.stringify(s), '→ chatDisabled:', !!window.CG_CHAT_DISABLED);
+            },
+            updateRoom(roomId, joinable) {
+                if (!this.ready || !roomId) return;
+                try {
+                    window.CrazyGames.SDK.game.updateRoom({ roomId: String(roomId), isJoinable: !!joinable, inviteParams: { roomId: String(roomId) } });
+                    // 참여 가능 상태면 초대 링크도 생성 (InviteLink 기능 사용 등록)
+                    if (joinable) { try { window.CrazyGames.SDK.game.inviteLink({ roomId: String(roomId) }); } catch (e) {} }
+                    this.lastRoomId = roomId;
+                } catch (e) {}
+            },
+            leftRoom() {
+                if (!this.ready) return;
+                if (this.lastRoomId) { try { window.CrazyGames.SDK.game.leftRoom(); } catch (e) {} this.lastRoomId = null; }
+                this.gameplayStop();
+            },
+            gameplayStart() { if (this.ready && !this.playing) { this.playing = true; try { window.CrazyGames.SDK.game.gameplayStart(); } catch (e) {} } },
+            gameplayStop()  { if (this.ready && this.playing) { this.playing = false; try { window.CrazyGames.SDK.game.gameplayStop(); } catch (e) {} } },
+            // [CG-SDK] 게임이 크레이지게임즈 프레임보다 크면 통째로 축소해서 한 화면에 담기 (데스크톱만)
+            fitViewport() {
+                if (!this.ready) return;
+                const el = document.getElementById('game-container');
+                if (!el) return;
+                const reset = () => {
+                    el.style.transform = ''; el.style.transformOrigin = ''; el.style.marginTop = ''; el.style.marginBottom = '';
+                    document.body.classList.remove('cg-scaled');
+                };
+                if (window.innerWidth < 1024) { reset(); return; } // 모바일은 기본 반응형 유지
+                const MARGIN = 16;
+                const availW = window.innerWidth - MARGIN, availH = window.innerHeight - MARGIN;
+                const w = el.offsetWidth, h = el.offsetHeight;
+                if (!w || !h) return;
+                const scale = Math.min(1, availW / w, availH / h);
+                if (scale >= 0.995) { reset(); return; }
+                document.body.classList.add('cg-scaled');
+                el.style.transformOrigin = 'top center';
+                el.style.transform = `scale(${scale})`;
+                el.style.marginTop = Math.max(0, (window.innerHeight - h * scale) / 2) + 'px';
+                el.style.marginBottom = (-(h - h * scale)) + 'px';
+            },
+            watchViewport() {
+                const run = () => this.fitViewport();
+                window.addEventListener('resize', run);
+                const el = document.getElementById('game-container');
+                if (el && window.ResizeObserver) new ResizeObserver(run).observe(el);
+                run();
+                setTimeout(run, 500); setTimeout(run, 1500); // 초기 렌더 안정화 후 재계산
+            },
+        };
+        function cgWaitAuth() {
+            return new Promise((res) => {
+                const t = setInterval(() => { if (userId) { clearInterval(t); res(); } }, 150);
+                setTimeout(() => { clearInterval(t); res(); }, 15000);
+            });
+        }
+        function cgGuestReady() {
+            if (!myNickname) myNickname = 'GUEST' + Math.floor(100 + Math.random() * 900);
+            try { guestMode = true; if (typeof updateLobbyUI === 'function') updateLobbyUI(); } catch (e) {}
+        }
+        async function cgAutoJoin(roomId) {
+            console.log('[CG] invite join attempt → roomId:', roomId);
+            await cgWaitAuth();
+            cgGuestReady();
+            try {
+                await callFn('joinRoom', { gameId: roomId, nickname: myNickname });
+                if (window.SoundManager) window.SoundManager.init();
+                enterGame(roomId);
+            } catch (e) {
+                // 방이 이미 시작/종료된 경우: 안내 후 로비에서 새로 시작할 수 있게
+                console.warn('[CG] invite join failed for roomId:', roomId, '| reason:', e.message || e);
+                alert("This room already started or ended.\nCreate a new room and invite your friends again!");
+            }
+        }
+        // [CG-ACCOUNT] 크레이지게임즈 로그인 유저 자동 계정 연동:
+        // SDK 토큰 → 서버 검증 → Firebase 커스텀 토큰 로그인 → 전적이 CG 계정에 자동 저장/동기화
+        async function cgAccountLogin() {
+            try {
+                const u = window.CrazyGames.SDK.user;
+                if (!u) return false;
+                const available = await u.isUserAccountAvailable();
+                if (!available) return false;
+                const cgUser = await u.getUser();
+                if (!cgUser) { console.log('[CG] not logged in on CrazyGames → guest'); return false; }
+                const cgToken = await u.getUserToken();
+                const res = await callFn('cgLogin', { token: cgToken });
+                const cred = await signInWithCustomToken(auth, res.token);
+                userId = cred.user.uid; // 익명 uid → cg_ 고정 uid로 교체
+                const uname = String(res.username || cgUser.username || 'PLAYER').replace(/[^a-zA-Z0-9가-힣]/g, '').slice(0, 10) || 'PLAYER';
+                onAccountReady(uname);
+                guestMode = true; // 로비 진입 허용
+                if (typeof updateLobbyUI === 'function') updateLobbyUI();
+                console.log('[CG] account linked:', uname, userId);
+                return true;
+            } catch (e) { console.warn('[CG] account login skipped:', e.message || e); return false; }
+        }
+        (async () => {
+            await CG.init();
+            console.log('[CG] SDK ready:', CG.ready);
+            if (!CG.ready) return;
+            const g = window.CrazyGames.SDK.game;
+            try { g.loadingStart(); } catch (e) {}
+            await cgWaitAuth();
+            try { g.loadingStop(); } catch (e) {}
+            console.log('[CG] auth userId:', userId);
+            // 크레이지게임즈 계정이 있으면 자동 연동 (없으면 게스트 유지)
+            await cgAccountLogin();
+            // 초대 링크로 들어온 경우: 온보딩 없이 바로 그 방으로
+            let invited = null;
+            try { invited = g.getInviteParam ? g.getInviteParam('roomId') : null; } catch (e) {}
+            console.log('[CG] inviteParam roomId:', invited);
+            if (invited) { cgAutoJoin(String(invited)); return; }
+            // 멀티플레이어 페이지에서 실행: 파티장은 즉시 비공개 방 생성
+            let instant = false;
+            try { instant = !!g.isInstantMultiplayer; } catch (e) { console.warn('[CG] isInstantMultiplayer read failed', e); }
+            // QA/로컬 테스트용 URL 파라미터 폴백
+            try {
+                const qs = new URLSearchParams(location.search);
+                if (qs.get('instantMultiplayer') === 'true' || qs.get('instantJoin') === 'true') instant = true;
+            } catch (e) {}
+            console.log('[CG] instantMultiplayer:', instant);
+            if (instant) { cgGuestReady(); console.log('[CG] creating instant room as', myNickname); createPublicRoom('PARTY'); }
+        })();
 
         async function syncServerClock() {
             try {
@@ -1061,7 +1281,9 @@
         let myOverwritesLeft = MAX_OVERWRITES;
         let currentQueueDocs = []; 
         let lastProcessedTurn = 0; 
-        let isAnimating = false; 
+        let isAnimating = false;
+        // [FREEZE-FIX] 애니메이션 고착 방지: 세대 카운터 + 예상 종료시각 워치독
+        let animGen = 0, animEndAt = 0;
         let pendingBoardState = null; 
         let pendingGameEndData = null; 
         let selectedFriendIds = new Set(); 
@@ -1323,6 +1545,7 @@
             });
         }
         window.sendRoomChat = async (srcId) => {
+            if (window.CG_CHAT_DISABLED) return; // [CG-SDK] 플랫폼 설정으로 채팅 비활성 시 차단
             const input = document.getElementById(srcId || 'wr-chat-input');
             if (!input || !gameId) return;
             const text = input.value.trim().slice(0, 200);
@@ -1714,6 +1937,8 @@
         }
 
         function resetLocalStateAndUI() {
+            CG.leftRoom(); // [CG-SDK] 방 퇴장을 플랫폼에 알림
+            releaseWakeLock(); // [FREEZE-FIX]
             stopQueueWatchdog();
             stopRoomHeartbeat();
             unsubscribeChat();
@@ -1813,6 +2038,17 @@
         function handleGameUpdate(gameData) {
             if (gameData.status === 'waiting' && gameData.hostId === userId) startRoomHeartbeat();
             else stopRoomHeartbeat();
+            // [CG-SDK] 방 상태를 플랫폼에 공유 → 초대 버튼/친구 참여 활성화
+            if (gameData.status === 'waiting') {
+                CG.updateRoom(gameId, Object.keys(gameData.players || {}).length < 3);
+            } else if (gameData.status === 'playing') {
+                CG.updateRoom(gameId, false);
+                CG.gameplayStart();
+                acquireWakeLock(); // [FREEZE-FIX] 게임 중 화면 꺼짐 방지
+            } else if (gameData.status === 'finished') {
+                CG.gameplayStop();
+                releaseWakeLock();
+            }
             // 인게임 채팅: 사람이 2명 이상일 때만 표시 (솔로 AI전 제외)
             const gcSec = document.getElementById('game-chat-section');
             if (gcSec) {
@@ -2031,6 +2267,7 @@
         }
 
         function triggerSequentialAnimations(events, gameData) {
+            const myAnim = ++animGen; // [FREEZE-FIX] 새 애니메이션 시작 시 이전 잔여 타임아웃 무효화
             if (!events || events.length === 0) {
                 isAnimating = false; currentBoardState = pendingBoardState;
                 renderBoard(currentBoardState, gameData);
@@ -2047,6 +2284,7 @@
                 else if (ev.type === 'conflict') duration = (ev.colors.length * 605) + 605;
                 
                 setTimeout(() => {
+                    if (myAnim !== animGen) return; // [FREEZE-FIX] 무효화된 애니메이션이면 중단
                     const cells = boardElement.querySelectorAll('.cell');
                     if (cells[cellIdx]) {
                         const cell = cells[cellIdx];
@@ -2057,13 +2295,14 @@
                             const colors = (ev.colors || []).sort((a, b) => sortOrder.indexOf(a) - sortOrder.indexOf(b));
                             colors.forEach((cCode, i) => {
                                 setTimeout(() => {
+                                    if (myAnim !== animGen) return;
                                     if(window.SoundManager) window.SoundManager.playGlass(); 
                                     cell.classList.remove('bg-white', 'bg-player-red', 'bg-player-yellow', 'bg-player-blue');
                                     cell.classList.add(COLOR_MAP[cCode].code);
                                     cell.style.animation = 'shine-pulse 0.6s forwards'; 
                                 }, i * 605); 
                             });
-                            setTimeout(() => { cell.style.animation = 'vanish-anim 0.6s forwards'; }, colors.length * 605);
+                            setTimeout(() => { if (myAnim === animGen) cell.style.animation = 'vanish-anim 0.6s forwards'; }, colors.length * 605);
                         } else if (ev.type === 'success') {
                             if(window.SoundManager) window.SoundManager.playGlass();
                             cell.classList.remove('bg-white'); cell.classList.add(COLOR_MAP[ev.color].code);
@@ -2078,7 +2317,9 @@
                 }, accumulatedDelay);
                 accumulatedDelay += duration;
             });
+            animEndAt = Date.now() + accumulatedDelay + 400; // [FREEZE-FIX] 워치독 기준 시각
             setTimeout(() => {
+                if (myAnim !== animGen) return; // [FREEZE-FIX]
                 isAnimating = false; currentBoardState = pendingBoardState;
                 renderBoard(currentBoardState, gameData);
                 if (gameData.status === 'finished') {
@@ -2117,7 +2358,15 @@
             const capSec = (gameData && gameData.turn === 1) ? 10 : 5;
             const DISPLAY_SHIFT_MS = 250;
             const updateTimer = () => {
-                if (isAnimating) { updateTimerDisplay("0"); updateTimerBar(0); return; }
+                if (isAnimating) {
+                    // [FREEZE-FIX] 워치독: 예상 종료시각을 한참 지났는데도 안 풀렸으면 강제 종료 (백그라운드 타임아웃 지연 대응)
+                    if (animEndAt && Date.now() > animEndAt + 1200) {
+                        animGen++; isAnimating = false;
+                        if (pendingBoardState) { currentBoardState = pendingBoardState; renderBoard(currentBoardState, gameData); }
+                    } else {
+                        updateTimerDisplay("0"); updateTimerBar(0); return;
+                    }
+                }
                 const now = serverNow();
                 const totalDiff = deadline - now;
                 const visualDiff = totalDiff - NETWORK_BUFFER_MS;
@@ -2599,6 +2848,7 @@
             return { u, p };
         }
         window.openAccount = () => {
+            if (CG.ready) return; // [CG-SDK] 크레이지게임즈 내에서는 게스트 전용
             if (myAccountName) {
                 // 이미 로그인 → 로그아웃 확인
                 if (confirm("Log out from " + myAccountName + "?")) {
