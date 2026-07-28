@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -162,6 +162,35 @@
         }
         @media (max-width: 1023px) {
             .chamello-icon { width: 54px; height: 36px; }
+        }
+
+        /* [CURSOR-SWAP] 실행 대기 중, 기본 커서가 무지개 카멜레온으로 바뀜 */
+        body.cursor-loading, body.cursor-loading * { cursor: none !important; }
+        /* 커서 이미지와 완전 동일 배치: 36x25px, 핫스팟 (0,11) → top을 -11px 보정 */
+        #cursor-glow {
+            position: fixed; left: -100px; top: -100px;
+            width: 36px; height: 25px; margin-top: -11px;
+            pointer-events: none; z-index: 9999;
+            transform-origin: 0px 11px; /* 핫스팟 기준으로 숨쉬기 → 위치 흔들림 없음 */
+            animation: glowBreath 1s ease-in-out infinite;
+            opacity: 0; transition: opacity 0.12s ease;
+            will-change: transform, opacity;
+        }
+        #cursor-glow::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(45deg, #ff0000, #ffa500, #ffff00, #008000, #0000ff, #4b0082, #ee82ee, #ff0000);
+            background-size: 400% 400%;
+            -webkit-mask-image: var(--cham-mask); mask-image: var(--cham-mask);
+            -webkit-mask-size: contain; mask-size: contain;
+            -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+            -webkit-mask-position: center; mask-position: center;
+            transform: scaleX(-1); /* 커서 이미지와 같은 왼쪽 방향 */
+            animation: rainbowCycle 3s linear infinite;
+        }
+        #cursor-glow.on { opacity: 1; }
+        @keyframes glowBreath {
+            0%, 100% { transform: scale(0.94); }
+            50%      { transform: scale(1.1); }
         }
 
         /* --- 부드러운 턴 타이머 진행바 --- */
@@ -923,9 +952,45 @@
         let clockOffset = 0;
         function serverNow() { return Date.now() + clockOffset; }
         // --- [SERVER] Cloud Functions 호출 헬퍼 ---
+        // [CURSOR-GLOW] 서버 응답 대기 중 커서/터치 지점에 무지개 숨쉬기 표시
+        const cursorGlowEl = document.createElement('div');
+        cursorGlowEl.id = 'cursor-glow';
+        document.body.appendChild(cursorGlowEl);
+        let glowX = window.innerWidth / 2, glowY = window.innerHeight / 2;
+        let glowPending = 0, glowShowTimer = null;
+        const trackGlowPos = (e) => {
+            glowX = e.clientX; glowY = e.clientY;
+            cursorGlowEl.style.left = glowX + 'px';
+            cursorGlowEl.style.top = glowY + 'px';
+        };
+        window.addEventListener('pointermove', trackGlowPos, { passive: true });
+        window.addEventListener('pointerdown', trackGlowPos, { passive: true });
+        function glowStart() {
+            glowPending++;
+            if (glowPending === 1) {
+                // 아주 빠른 응답(80ms 미만)엔 깜빡임 방지를 위해 표시 생략
+                glowShowTimer = setTimeout(() => {
+                    cursorGlowEl.style.left = glowX + 'px';
+                    cursorGlowEl.style.top = glowY + 'px';
+                    cursorGlowEl.classList.add('on');
+                    document.body.classList.add('cursor-loading'); // 기본 커서 숨김 → 카멜레온이 커서가 됨
+                }, 80);
+            }
+        }
+        function glowEnd() {
+            glowPending = Math.max(0, glowPending - 1);
+            if (glowPending === 0) {
+                clearTimeout(glowShowTimer);
+                cursorGlowEl.classList.remove('on');
+                document.body.classList.remove('cursor-loading'); // 기본 커서 복원
+            }
+        }
         async function callFn(name, data) {
-            const res = await httpsCallable(fns, name)(data || {});
-            return res.data;
+            glowStart();
+            try {
+                const res = await httpsCallable(fns, name)(data || {});
+                return res.data;
+            } finally { glowEnd(); }
         }
 
         async function syncServerClock() {
@@ -1253,17 +1318,39 @@
             try { await callFn('leaveRoom', { gameId: gid }); } catch (e) { console.warn(e); }
         };
         // --- 모바일 오버레이 채팅 ---
+        // [KBD-FIX] 키보드가 열려도 게임 화면은 그대로 두고, 입력바만 키보드 바로 위에 붙임
+        let mobChatVVHandler = null;
         window.openMobChat = () => {
             const w = document.getElementById('mob-chat-wrap');
             w.classList.remove('hidden');
             const inp = document.getElementById('mob-chat-input');
-            setTimeout(() => inp.focus(), 50);
+            setTimeout(() => inp.focus({ preventScroll: true }), 50);
+            if (window.visualViewport && !mobChatVVHandler) {
+                mobChatVVHandler = () => {
+                    const vv = window.visualViewport;
+                    // 키보드 높이만큼 입력바를 위로 (fixed bottom 기준 보정)
+                    const gap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                    w.style.bottom = gap + 'px';
+                    // 브라우저가 포커스 때문에 페이지를 밀어올리면 즉시 원위치 → 게임 화면 고정
+                    if (window.scrollY !== 0) window.scrollTo(0, 0);
+                };
+                window.visualViewport.addEventListener('resize', mobChatVVHandler);
+                window.visualViewport.addEventListener('scroll', mobChatVVHandler);
+                mobChatVVHandler();
+            }
         };
         window.closeMobChat = () => {
             const w = document.getElementById('mob-chat-wrap');
             w.classList.add('hidden');
+            w.style.bottom = '';
             const inp = document.getElementById('mob-chat-input');
             if (inp) inp.blur();
+            if (window.visualViewport && mobChatVVHandler) {
+                window.visualViewport.removeEventListener('resize', mobChatVVHandler);
+                window.visualViewport.removeEventListener('scroll', mobChatVVHandler);
+                mobChatVVHandler = null;
+            }
+            window.scrollTo(0, 0);
         };
         function setMobChatVisible(on) {
             const btn = document.getElementById('mob-chat-btn');
@@ -1998,9 +2085,9 @@
             const turnTotalMs = Math.max(1000, (deadline - serverNow()) - NETWORK_BUFFER_MS);
             // [표시 캡+지연] 6/11 방지 + 5와 10이 1초 더 머물다 카운트 시작
             const capSec = (gameData && gameData.turn === 1) ? 10 : 5;
-            const DISPLAY_SHIFT_MS = 500;
+            const DISPLAY_SHIFT_MS = 250;
             const updateTimer = () => {
-                if (isAnimating) { updateTimerDisplay("\u00b7\u00b7\u00b7"); updateTimerBar(0); return; }
+                if (isAnimating) { updateTimerDisplay("0"); updateTimerBar(0); return; }
                 const now = serverNow();
                 const totalDiff = deadline - now;
                 const visualDiff = totalDiff - NETWORK_BUFFER_MS;
@@ -2011,7 +2098,7 @@
                 let secondsLeft = Math.min(capSec, Math.ceil(dispDiff / 1000));
                 if (secondsLeft > 0) updateTimerDisplay(secondsLeft.toString());
                 else {
-                    updateTimerDisplay("\u00b7\u00b7\u00b7");
+                    updateTimerDisplay("0");
                     // [NET-FIX 3] 호스트가 백그라운드/이탈 시 백업 해결을 계단식으로:
                     // 호스트 0ms → 다음 유저 +1.5s → 그다음 +3s (기존: 전원 일괄 3s 대기)
                     const isHost = userId === gameData.hostId;
