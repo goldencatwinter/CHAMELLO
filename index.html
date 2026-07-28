@@ -44,14 +44,14 @@
         }
 
         @keyframes shine-pulse {
-            0% { transform: scale(0.9); filter: brightness(1.5); box-shadow: 0 0 0 0 rgba(255,255,255,0.7); }
-            50% { transform: scale(1.05); filter: brightness(1.2); box-shadow: 0 0 20px 5px rgba(255,255,255,0.5); }
-            100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+            0% { filter: brightness(2.2); box-shadow: inset 0 0 0 3px rgba(255,255,255,0.9); }
+            60% { filter: brightness(1.25); box-shadow: inset 0 0 12px 2px rgba(255,255,255,0.5); }
+            100% { filter: brightness(1); box-shadow: inset 0 0 0 0 rgba(255,255,255,0); }
         }
 
         @keyframes vanish-anim {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(0.5); opacity: 0; }
+            0% { filter: brightness(1); }
+            100% { background-color: #fff; filter: brightness(1); }
         }
 
         @keyframes flip-anim {
@@ -189,18 +189,12 @@
         button, .press-item { transition: transform 0.06s ease-out; }
         button:active, .press-item:active { transform: scale(0.95); }
 
-        /* 보드 확대/제스처 완전 차단 + 쫀득한 탭 피드백 */
+        /* 보드: 완전 정적 (변형 없음). 더블탭 줌만 차단, 스크롤은 허용 */
         #game-board, #game-board .cell {
-            touch-action: none;
+            touch-action: manipulation;
             -webkit-user-select: none; user-select: none;
             -webkit-touch-callout: none;
             -webkit-tap-highlight-color: transparent;
-        }
-        #game-board .cell {
-            transition: transform 0.07s ease-out;
-        }
-        #game-board .cell:active {
-            transform: scale(0.9);
         }
 
         /* 노치/펀치홀 Safe Area */
@@ -496,6 +490,18 @@
                 </ul>
             </div>
 
+            <div id="game-chat-section" class="hidden shrink-0 border-t border-gray-200 pt-3">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">CHAT</p>
+                <div id="gc-list" class="h-24 overflow-y-auto text-[11px] leading-relaxed mb-2 bg-white border border-gray-200 rounded p-2"></div>
+                <div class="flex gap-1.5">
+                    <input id="gc-input" type="text" maxlength="200" placeholder="Message..."
+                        onkeyup="window.roomChatKey(event)"
+                        class="flex-1 bg-white border-2 border-gray-200 focus:border-black px-2 py-1.5 text-xs font-bold focus:outline-none">
+                    <button onclick="window.sendRoomChat('gc-input')"
+                        class="bg-black text-white text-[10px] font-black px-3 uppercase tracking-widest hover:bg-gray-800">Send</button>
+                </div>
+            </div>
+
             <div id="lobby-panels" class="flex-1 flex flex-col gap-4 overflow-hidden min-h-0">
                 
                 <div id="queue-section" class="flex-1 flex flex-col min-h-0 bg-white border border-gray-200 p-4 shadow-sm">
@@ -674,7 +680,7 @@
                     const s = this.ctx.createBufferSource();
                     s.buffer = this.clickBuf;
                     const g = this.ctx.createGain();
-                    g.gain.value = 0.23; // 클릭음 볼륨
+                    g.gain.value = 0.18; // 클릭음 볼륨
                     s.connect(g); g.connect(this.master);
                     s.start();
                     return;
@@ -723,6 +729,76 @@
             btn.classList.toggle('text-gray-700', !s.muted);
         };
         // 모든 버튼·방 목록 클릭에 소리 (위임 — 동적으로 생긴 요소도 포함)
+        // ================= 매니저 모드 (Ctrl+Shift+M): SNS 홍보용 화면 녹화 =================
+        let mgrRecorder = null, mgrChunks = [], mgrStream = null, mgrTimer = null, mgrSec = 0;
+        window.toggleManager = () => {
+            let p = document.getElementById('manager-panel');
+            if (p) { if (!mgrRecorder) p.remove(); return; } // 녹화 중엔 닫기 방지
+            p = document.createElement('div');
+            p.id = 'manager-panel';
+            p.className = 'fixed bottom-4 left-4 z-[96] bg-black/90 text-white p-3 shadow-2xl border border-white/20 text-left';
+            p.innerHTML = `
+                <div class="flex items-center justify-between gap-4 mb-2">
+                    <span class="text-[9px] font-black tracking-[0.25em] uppercase text-white/60">Manager Mode</span>
+                    <button onclick="window.toggleManager()" class="text-white/50 hover:text-white leading-none">&times;</button>
+                </div>
+                <button id="mgr-rec-btn" onclick="window.mgrToggleRec()"
+                    class="w-full bg-red-600 hover:bg-red-500 text-white font-black text-xs tracking-widest uppercase px-4 py-2.5 flex items-center justify-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-white"></span> REC
+                </button>
+                <p id="mgr-hint" class="text-[9px] text-white/40 font-bold mt-2 leading-relaxed">Pick "This Tab" + share tab audio.<br>Clip saves as .mp4 when stopped.</p>`;
+            document.body.appendChild(p);
+        };
+        window.mgrToggleRec = async () => {
+            const btn = document.getElementById('mgr-rec-btn');
+            const hint = document.getElementById('mgr-hint');
+            if (mgrRecorder) { mgrRecorder.stop(); return; }
+            try {
+                mgrStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 60 }, audio: true });
+            } catch (e) { return; }
+            mgrChunks = [];
+            // mp4 우선 (SNS 바로 업로드용), 미지원 브라우저만 webm 폴백
+            const mimeCandidates = [
+                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                'video/mp4;codecs=avc1',
+                'video/mp4',
+                'video/webm;codecs=vp9,opus',
+                'video/webm'
+            ];
+            const mime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+            const isMp4 = mime.startsWith('video/mp4');
+            mgrRecorder = new MediaRecorder(mgrStream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+            mgrRecorder._ext = isMp4 ? 'mp4' : 'webm';
+            mgrRecorder._mime = isMp4 ? 'video/mp4' : 'video/webm';
+            mgrRecorder.ondataavailable = (e) => { if (e.data && e.data.size) mgrChunks.push(e.data); };
+            mgrRecorder.onstop = () => {
+                clearInterval(mgrTimer); mgrTimer = null; mgrSec = 0;
+                const blob = new Blob(mgrChunks, { type: (mgrRecorder && mgrRecorder._mime) || 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.href = url; a.download = 'chamello_clip_' + ts + '.' + ((mgrRecorder && mgrRecorder._ext) || 'mp4');
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                if (mgrStream) { mgrStream.getTracks().forEach(t => t.stop()); mgrStream = null; }
+                mgrRecorder = null;
+                if (btn) btn.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> REC';
+                if (hint) hint.innerHTML = 'Saved! Check your downloads folder.';
+            };
+            mgrStream.getVideoTracks()[0].addEventListener('ended', () => { if (mgrRecorder) mgrRecorder.stop(); });
+            mgrRecorder.start(500);
+            mgrSec = 0;
+            mgrTimer = setInterval(() => {
+                mgrSec++;
+                if (btn) btn.innerHTML = '<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> STOP \u00b7 ' + String(Math.floor(mgrSec / 60)).padStart(2, '0') + ':' + String(mgrSec % 60).padStart(2, '0');
+            }, 1000);
+            if (btn) btn.innerHTML = '<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> STOP \u00b7 00:00';
+            if (hint) hint.innerHTML = 'Recording... press STOP to save.';
+        };
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && (e.key === 'M' || e.key === 'm')) { e.preventDefault(); window.toggleManager(); }
+        });
+
         document.addEventListener('click', (e) => {
             if (e.target && e.target.closest && e.target.closest('button, .press-item')) {
                 if (window.SoundManager && window.SoundManager.ctx) window.SoundManager.playClick();
@@ -732,9 +808,6 @@
         // iOS 핀치 확대·더블탭 확대 원천 차단 (게임판 늘어남 방지)
         document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
         document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
-        document.addEventListener('touchmove', (e) => {
-            if (e.target && e.target.closest && e.target.closest('#game-board')) e.preventDefault();
-        }, { passive: false });
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (e) => {
             const now = Date.now();
@@ -1041,33 +1114,44 @@
         // ================= 대기방 채팅 =================
         let chatUnsub = null, chatMsgs = [], chatDraft = '', chatJoinMs = 0;
         let lastWaitingSig = '';
+        let chatInitDone = false;
         function subscribeChat(gid) {
             if (chatUnsub) return;
-            chatJoinMs = serverNow() - 1500; // 내가 입장한 시점 이후 채팅만 표시
+            chatInitDone = false;
             const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'games', gid, 'chat');
             const q = query(chatRef, orderBy('ts', 'asc'), limit(60));
             chatUnsub = onSnapshot(q, (snap) => {
-                chatMsgs = snap.docs.map(d => d.data())
-                    .filter(m => !m.ts || m.ts.toMillis() >= chatJoinMs);
+                if (!chatInitDone) {
+                    // 첫 스냅샷 = 입장 이전 대화 → 숨김 (기기 시계와 무관하게 스냅샷 자체가 기준)
+                    chatInitDone = true;
+                    chatMsgs = [];
+                    renderChatMsgs();
+                    return;
+                }
+                // 이후 새로 추가된 메시지만 누적 → 보낸 사람 본인에게도 즉시 보임
+                snap.docChanges().forEach(ch => {
+                    if (ch.type === 'added') chatMsgs.push(ch.doc.data());
+                });
                 renderChatMsgs();
             }, () => {});
         }
         function unsubscribeChat() {
             if (chatUnsub) { chatUnsub(); chatUnsub = null; }
-            chatMsgs = []; chatDraft = ''; lastWaitingSig = '';
+            chatMsgs = []; chatDraft = ''; lastWaitingSig = ''; chatInitDone = false;
         }
         function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         function renderChatMsgs() {
-            const list = document.getElementById('wr-chat-list');
-            if (!list) return;
-            list.innerHTML = chatMsgs.map(m => {
+            const html = chatMsgs.map(m => {
                 const mine = m.uid === userId;
                 return `<div class="text-left mb-1"><span class="font-black uppercase ${mine ? 'text-black' : 'text-gray-500'}">${esc((m.name || 'P').slice(0, 10))}</span><span class="text-gray-700"> : ${esc(m.text || '')}</span></div>`;
             }).join('') || '<p class="text-gray-300 text-center py-2">Say hi to your friends!</p>';
-            list.scrollTop = list.scrollHeight;
+            ['wr-chat-list', 'gc-list'].forEach(id => {
+                const list = document.getElementById(id);
+                if (list) { list.innerHTML = html; list.scrollTop = list.scrollHeight; }
+            });
         }
-        window.sendRoomChat = async () => {
-            const input = document.getElementById('wr-chat-input');
+        window.sendRoomChat = async (srcId) => {
+            const input = document.getElementById(srcId || 'wr-chat-input');
             if (!input || !gameId) return;
             const text = input.value.trim().slice(0, 200);
             if (!text) return;
@@ -1078,7 +1162,7 @@
         };
         window.roomChatKey = (e) => {
             chatDraft = e.target.value;
-            if (e.key === 'Enter') window.sendRoomChat();
+            if (e.key === 'Enter') window.sendRoomChat(e.target.id);
         };
         window.leaveRoomNow = async () => {
             if (!gameId) return;
@@ -1488,7 +1572,15 @@
         function handleGameUpdate(gameData) {
             if (gameData.status === 'waiting' && gameData.hostId === userId) startRoomHeartbeat();
             else stopRoomHeartbeat();
-            if (gameData.status !== 'waiting') unsubscribeChat();
+            // 인게임 채팅: 사람이 2명 이상일 때만 표시 (솔로 AI전 제외)
+            const gcSec = document.getElementById('game-chat-section');
+            if (gcSec) {
+                const humanCount = Object.values(gameData.players).filter(p => !p.isAI).length;
+                const showGC = gameData.status !== 'waiting' && humanCount >= 2;
+                gcSec.classList.toggle('hidden', !showGC);
+                if (showGC) subscribeChat(gameId);
+            }
+            // 게임 중에도 채팅 유지 (구독은 로비 복귀 시에만 해제)
             if (gameId && userId && !gameData.players[userId]) {
                 resetLocalStateAndUI();
                 return;
@@ -1884,13 +1976,6 @@
             selectedCell = { r, c, isOverwrite };
             haptic(isOverwrite ? 'heavy' : 'light');
             renderBoard(currentBoardState, { status: 'playing' });
-            // 선택된 칸 쫀득 바운스 (iOS는 진동 API가 없어 시각 촉감으로 보강)
-            const selEl = boardElement.querySelectorAll('.cell')[r * BOARD_SIZE + c];
-            if (selEl) selEl.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.06)', offset: 0.6 },
-                { transform: 'scale(1)' }
-            ], { duration: 180, easing: 'cubic-bezier(.34,1.56,.64,1)' });
             // [SERVER] 선택 즉시 서버에 제출 — 서버가 규칙 검증 후 기록 (치트 불가)
             try {
                 await callFn('submitMove', { gameId: gameId, r: r, c: c, isOverwrite: isOverwrite });
