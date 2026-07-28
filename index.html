@@ -187,7 +187,7 @@
 
         /* 보드 확대/제스처 완전 차단 + 쫀득한 탭 피드백 */
         #game-board, #game-board .cell {
-            touch-action: manipulation;
+            touch-action: none;
             -webkit-user-select: none; user-select: none;
             -webkit-touch-callout: none;
             -webkit-tap-highlight-color: transparent;
@@ -691,6 +691,9 @@
         // iOS 핀치 확대·더블탭 확대 원천 차단 (게임판 늘어남 방지)
         document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
         document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+        document.addEventListener('touchmove', (e) => {
+            if (e.target && e.target.closest && e.target.closest('#game-board')) e.preventDefault();
+        }, { passive: false });
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (e) => {
             const now = Date.now();
@@ -834,6 +837,166 @@
         let lastGameMode = null; 
         let isMoveCommitted = false; 
 
+        // ================= 로비 데모 플레이 v2 (실제 게임 리듬 재현) =================
+        // 5초 턴 · 빨강 시점의 선택 미리보기 · 시간 종료 시 순차 공개 · 충돌/브레이커/연쇄 뒤집기
+        let demoTimer = null, demoActive = false, demoTimeouts = [];
+        function dT(fn, ms) { const id = setTimeout(() => { if (demoActive) fn(); }, ms); demoTimeouts.push(id); return id; }
+        function demoFlips(bd, r, c, color) {
+            const flips = [];
+            const dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+            for (const [dr, dc] of dirs) {
+                const line = [];
+                let rr = r + dr, cc = c + dc;
+                while (rr >= 0 && rr < 5 && cc >= 0 && cc < 5 && bd[rr][cc] !== '' && bd[rr][cc] !== color) {
+                    line.push([rr, cc]); rr += dr; cc += dc;
+                }
+                if (line.length && rr >= 0 && rr < 5 && cc >= 0 && cc < 5 && bd[rr][cc] === color) flips.push(...line);
+            }
+            return flips;
+        }
+        function demoPickMove(bd, color, breakers) {
+            let best = null, bestScore = -1;
+            for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+                if (bd[r][c] === '') {
+                    const s = demoFlips(bd, r, c, color).length + Math.random() * 1.5;
+                    if (s > bestScore) { bestScore = s; best = { r, c, ow: false }; }
+                } else if (bd[r][c] !== color && breakers > 0 && Math.random() < 0.06) {
+                    const s = demoFlips(bd, r, c, color).length + 1 + Math.random();
+                    if (s > bestScore) { bestScore = s; best = { r, c, ow: true }; }
+                }
+            }
+            return best;
+        }
+        function startDemoCountdown() {
+            clearTimeout(demoTimer);
+            demoTimer = setTimeout(() => {
+                if (!gameId && !queueDocId && !isWaitingRoomHost) startDemoPlay();
+            }, 10000);
+        }
+        function stopDemoPlay() {
+            demoActive = false;
+            clearTimeout(demoTimer);
+            demoTimeouts.forEach(clearTimeout); demoTimeouts = [];
+            const badge = document.getElementById('demo-badge');
+            if (badge) badge.remove();
+            boardElement.querySelectorAll('.demo-cell').forEach(el => el.remove());
+            const ws = boardElement.querySelector('.col-span-5');
+            if (ws) ws.classList.remove('hidden');
+        }
+        function startDemoPlay() {
+            if (demoActive || gameId || queueDocId) return;
+            demoActive = true;
+            const ws = boardElement.querySelector('.col-span-5');
+            if (ws) ws.classList.add('hidden');
+            boardElement.style.position = 'relative';
+            const badge = document.createElement('div');
+            badge.id = 'demo-badge';
+            badge.className = 'absolute top-1.5 left-1/2 -translate-x-1/2 z-10 bg-black/80 text-white px-2.5 py-1 pointer-events-none flex flex-col items-center gap-1';
+            badge.innerHTML = '<span class="text-[9px] font-black tracking-[0.25em] uppercase leading-none">Demo Play</span>' +
+                '<div class="w-20 h-0.5 bg-white/25 overflow-hidden"><div id="demo-bar" class="h-full bg-white" style="width:100%"></div></div>';
+            boardElement.appendChild(badge);
+
+            const bd = Array.from({ length: 5 }, () => Array(5).fill(''));
+            const brk = { R: 3, Y: 3, B: 3 };
+            const cellEls = [];
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < 25; i++) {
+                const d = document.createElement('div');
+                d.className = 'cell demo-cell w-full h-full bg-white';
+                frag.appendChild(d); cellEls.push(d);
+            }
+            boardElement.insertBefore(frag, boardElement.firstChild);
+
+            const paint = (r, c, color, anim) => {
+                const el = cellEls[r * 5 + c];
+                if (!el) return;
+                el.classList.remove('bg-white', 'bg-player-red', 'bg-player-yellow', 'bg-player-blue');
+                if (color) el.classList.add(COLOR_MAP[color].code); else el.classList.add('bg-white');
+                if (anim) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = anim; }
+                else { el.style.animation = ''; } // forwards로 박제된 잔류 애니메이션(투명 상태) 제거
+            };
+            const TURN_MS = 5000;
+
+            function turn() {
+                if (!demoActive) return;
+                // 세 AI가 동시에(비공개로) 수를 결정
+                const moves = ['R', 'Y', 'B']
+                    .map(col => { const m = demoPickMove(bd, col, brk[col]); return m ? { ...m, col } : null; })
+                    .filter(Boolean);
+                if (!moves.length) return;
+
+                // 5초 타이머 바
+                const bar = document.getElementById('demo-bar');
+                if (bar) { bar.getAnimations().forEach(a => a.cancel());
+                    bar.animate([{ width: '100%' }, { width: '0%' }], { duration: TURN_MS, easing: 'linear', fill: 'forwards' }); }
+
+                // [내 시점 = 빨강] 턴 중간에 고민하다 선택 → 미리보기 표시 (실제 게임과 동일)
+                let prevEl = null;
+                const pov = moves.find(m => m.col === 'R');
+                if (pov) dT(() => {
+                    prevEl = cellEls[pov.r * 5 + pov.c];
+                    paint(pov.r, pov.c, 'R', 'shine-pulse 0.3s forwards');
+                    prevEl.classList.add('ring-4', 'ring-inset', pov.ow ? 'ring-black' : 'ring-black/10');
+                    if (pov.ow) prevEl.classList.add('breaker-shine');
+                }, 1000 + Math.random() * 2300);
+
+                // 시간 종료 → 패 공개
+                dT(() => {
+                    if (prevEl) { prevEl.classList.remove('ring-4', 'ring-inset', 'ring-black', 'ring-black/10', 'breaker-shine'); prevEl = null; }
+                    const byPos = {};
+                    moves.forEach(m => { const k = m.r + ',' + m.c; (byPos[k] = byPos[k] || []).push(m); });
+                    const posKeys = Object.keys(byPos);
+                    const placed = [];
+                    let t = 0;
+                    // 하나씩 패가 펴지듯 순차 공개
+                    posKeys.forEach((k) => {
+                        const group = byPos[k];
+                        const { r, c } = group[0];
+                        if (group.length > 1) {
+                            // 충돌: 겹친 색이 차례로 번쩍 → 폭발 소멸 (원래 자리 주인도 파괴)
+                            group.forEach((m, i) => dT(() => paint(r, c, m.col, 'shine-pulse 0.45s forwards'), t + i * 450));
+                            dT(() => { bd[r][c] = ''; paint(r, c, null, 'vanish-anim 0.45s forwards'); }, t + group.length * 450);
+                            dT(() => paint(r, c, null), t + group.length * 450 + 500);
+                            t += group.length * 450 + 600;
+                        } else {
+                            const m = group[0];
+                            let ok = true;
+                            if (m.ow) { if (brk[m.col] > 0 && bd[r][c] !== '' && bd[r][c] !== m.col) brk[m.col]--; else ok = false; }
+                            else if (bd[r][c] !== '') ok = false;
+                            if (ok) {
+                                dT(() => paint(r, c, m.col, 'shine-pulse 0.5s forwards'), t);
+                                placed.push({ ...m, at: t });
+                                bd[r][c] = m.col;
+                                t += 420;
+                            }
+                        }
+                    });
+                    // 공개 완료 후 연쇄 뒤집기 (실제 규칙과 동일하게 순차 적용)
+                    let ft = t + 250;
+                    placed.forEach((m) => {
+                        const flips = demoFlips(bd, m.r, m.c, m.col);
+                        flips.forEach(([fr, fc], i) => {
+                            bd[fr][fc] = m.col;
+                            dT(() => paint(fr, fc, m.col, 'flip-anim 0.36s forwards'), ft + i * 130);
+                        });
+                        ft += flips.length * 130 + (flips.length ? 150 : 0);
+                    });
+                    // 다음 턴 or 판 종료
+                    const filled = bd.flat().filter(v => v !== '').length;
+                    if (filled >= 24) {
+                        dT(() => {
+                            for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) { bd[r][c] = ''; paint(r, c, null); }
+                            brk.R = 3; brk.Y = 3; brk.B = 3;
+                            dT(turn, 800);
+                        }, ft + 2200);
+                    } else {
+                        dT(turn, ft + 500);
+                    }
+                }, TURN_MS);
+            }
+            turn();
+        }
+
         // --- 대기방 호스트 하트비트 (15초마다 생존 신호 → 끊기면 방 자동 소멸) ---
         let roomHeartbeatTimer = null;
         function startRoomHeartbeat() {
@@ -891,6 +1054,7 @@
             syncServerClock();
             setInterval(syncServerClock, 5 * 60 * 1000); // 5분마다 재보정
             initAccountWatch(); // 인증 준비 후 계정 자동 복원
+            startDemoCountdown(); // 로비 10초 후 데모 플레이
 
             mobileTimerContainer.classList.add('hidden');
             overwriteUIContainer.classList.add('hidden');
@@ -987,6 +1151,7 @@
             joinBtn.disabled = true;
             nicknameInput.disabled = true;
             selectedFriendIds.clear();
+            stopDemoPlay();
             syncAccountName();
 
             try {
@@ -1165,9 +1330,12 @@
              
             setupPlayAgainListener();
             if (typeof updateLobbyUI === 'function') updateLobbyUI();
+            stopDemoPlay();
+            startDemoCountdown();
         }
 
         async function enterGame(id) {
+            stopDemoPlay();
             stopQueueWatchdog();
             gameId = id;
             await leaveQueue(); 
