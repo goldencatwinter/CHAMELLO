@@ -214,6 +214,10 @@
             color: #5865F2; animation: none; filter: none;
         }
 
+        /* [HEART] 하트 버튼: 누르는 동안 움츠렸다가 떼면 튕김 */
+        .heart-btn .heart-svg { transition: transform 0.08s ease; }
+        .heart-btn:active .heart-svg { transform: scale(0.72); }
+
         /* [RECORD] 카멜레온 제자리 걷기 (2프레임) — 게이지를 바닥 삼아 */
         @keyframes chamWalk {
             0%, 100% { transform: rotate(-3deg) translateY(0); }
@@ -667,7 +671,7 @@
                     </div>
                     <div class="relative flex flex-col items-center cursor-pointer select-none py-2 mb-2" onclick="window.openRanks()" title="Rank Chart">
                         <div id="record-rank-icon" class="cham-mask relative z-10" style="width:100px;height:68px;background:#9ca3af;margin-bottom:-17px"></div>
-                        <div class="h-1.5 bg-gray-100 w-full overflow-hidden relative z-10">
+                        <div class="h-1.5 bg-gray-100 w-full overflow-hidden relative z-0">
                             <div id="rec-next" class="h-full bg-waiting-rainbow" style="width:0%"></div>
                         </div>
                         <p id="rec-next-label" class="text-[9px] text-gray-400 font-bold uppercase tracking-widest relative z-10 mt-1">-</p>
@@ -2673,8 +2677,9 @@
              if (others.length && players[userId]) {
                  heartsRow.innerHTML = others.map(([pid, p]) => `
                      <button id="heart-${pid}" onclick="window.sendHeartTo('${pid}')"
-                             class="flex flex-col items-center gap-1 group">
-                         <svg width="30" height="30" viewBox="0 0 24 24" class="heart-svg transition-transform group-active:scale-90"
+                             class="heart-btn flex flex-col items-center gap-1 group p-2 -m-1"
+                             style="touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-width:56px;min-height:56px">
+                         <svg width="34" height="34" viewBox="0 0 24 24" class="heart-svg"
                               fill="none" stroke="white" stroke-width="2" stroke-linejoin="round">
                              <path d="M12 21s-7.5-4.9-10-9.2C.4 8.6 2.2 4.9 5.8 4.3c2-.3 4 .6 6.2 3 2.2-2.4 4.2-3.3 6.2-3 3.6.6 5.4 4.3 3.8 7.5C19.5 16.1 12 21 12 21z"/>
                          </svg>
@@ -2692,22 +2697,64 @@
              modal.classList.remove('hidden');
         }
 
+        function heartFill(svg, on) {
+            svg.setAttribute('fill', on ? '#ff3355' : 'none');
+            svg.setAttribute('stroke', on ? '#ff3355' : 'white');
+        }
+        function heartPoof(btn, svg) {
+            // 유령 하트가 커지고 투명해지며 퍼져 사라지는 효과
+            btn.style.position = 'relative';
+            const ghost = svg.cloneNode(true);
+            ghost.style.cssText = 'position:absolute;left:50%;top:0;margin-left:-17px;pointer-events:none;';
+            heartFill(ghost, true);
+            btn.appendChild(ghost);
+            ghost.animate([
+                { transform: 'scale(1)', opacity: 0.9 },
+                { transform: 'scale(2.4)', opacity: 0 }
+            ], { duration: 500, easing: 'ease-out' }).onfinish = () => ghost.remove();
+        }
         window.sendHeartTo = async (toUid) => {
             const btn = document.getElementById('heart-' + toUid);
-            if (!btn || btn.disabled || !gameId) return;
-            btn.disabled = true;
+            if (!btn || !gameId) return;
+            const now = Date.now();
+            if (btn.dataset.lock && now - btn.dataset.lock < 450) return; // 연타 방지
+            btn.dataset.lock = now;
             const svg = btn.querySelector('.heart-svg');
-            try {
-                await callFn('sendHeart', { gameId, toUid });
-                if (svg) {
-                    svg.setAttribute('fill', '#ff3355');
-                    svg.setAttribute('stroke', '#ff3355');
-                    svg.animate([
-                        { transform: 'scale(1)' }, { transform: 'scale(1.45)', offset: 0.4 }, { transform: 'scale(1)' }
-                    ], { duration: 350, easing: 'cubic-bezier(.34,1.56,.64,1)' });
-                }
+            if (!svg) return;
+            const sent = btn.dataset.sent === '1';
+            if (!sent) {
+                // ---- 보내기: 즉시 채움 + 눌림→튕김 + 퍼짐 효과 ----
+                btn.dataset.sent = '1';
+                heartFill(svg, true);
+                svg.animate([
+                    { transform: 'scale(0.72)' },
+                    { transform: 'scale(1.35)', offset: 0.45 },
+                    { transform: 'scale(0.92)', offset: 0.75 },
+                    { transform: 'scale(1)' }
+                ], { duration: 420, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+                heartPoof(btn, svg);
                 if (window.SoundManager && window.SoundManager.ctx) window.SoundManager.playClick();
-            } catch (e) { btn.disabled = false; console.warn('heart failed', e); }
+                try {
+                    await callFn('sendHeart', { gameId, toUid });
+                } catch (e) {
+                    btn.dataset.sent = '0'; heartFill(svg, false);
+                    console.warn('heart send failed', e);
+                }
+            } else {
+                // ---- 취소 (한 번 더 누름): 즉시 비움, 서버 취소는 뒤에서 ----
+                btn.dataset.sent = '0';
+                heartFill(svg, false);
+                svg.animate([
+                    { transform: 'scale(1)' }, { transform: 'scale(0.8)', offset: 0.5 }, { transform: 'scale(1)' }
+                ], { duration: 200, easing: 'ease-out' });
+                try {
+                    await callFn('cancelHeart', { gameId, toUid });
+                } catch (e) {
+                    // 서버에 취소 기능이 아직 없으면 조용히 원상복구 (보낸 상태 유지)
+                    btn.dataset.sent = '1'; heartFill(svg, true);
+                    console.warn('heart cancel unavailable', e);
+                }
+            }
         };
         window.triggerRematch = async () => {
              document.getElementById('message-modal').classList.add('hidden');
