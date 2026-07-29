@@ -1540,6 +1540,11 @@
         function unsubscribeChat() {
             if (chatUnsub) { chatUnsub(); chatUnsub = null; }
             chatMsgs = []; chatDraft = ''; lastWaitingSig = ''; chatInitDone = false;
+            // [정리 보강] 쓰다 만 입력 텍스트 제거 + 목록을 빈 상태로 즉시 다시 그림 (잔상 방지)
+            ['wr-chat-input', 'gc-input', 'mob-chat-input'].forEach(id => {
+                const el = document.getElementById(id); if (el) el.value = '';
+            });
+            renderChatMsgs();
         }
         function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         function renderChatMsgs() {
