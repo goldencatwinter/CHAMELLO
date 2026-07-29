@@ -885,23 +885,20 @@
             if (mgrRecorder) { if (mgrRecorder.state !== 'inactive') mgrRecorder.stop(); return; }
             try {
                 mgrStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { frameRate: 60, displaySurface: 'browser', cursor: 'always' }, // 탭 공유 기본, 커서 표시
-                    audio: true,
+                    // [화질개선] 1080p·30fps로 캡처 부하를 줄이고 비트레이트를 올려 뭉개짐 방지, 소리는 녹화 안 함
+                    video: { frameRate: 30, width: { ideal: 1920 }, height: { ideal: 1080 }, displaySurface: 'browser', cursor: 'always' },
+                    audio: false,
                     preferCurrentTab: true,           // "이 탭"을 첫 번째 옵션으로 제시 (Chrome)
                     selfBrowserSurface: 'include',    // 현재 탭을 목록에 포함
                     surfaceSwitching: 'exclude',      // 녹화 중 대상 전환 버튼 숨김
                     monitorTypeSurfaces: 'exclude'    // "전체 화면" 옵션 제거 (실수 방지)
                 });
             } catch (e) { return; }
+            // [화질개선] UI 화면은 선명도 우선으로 인코딩하도록 힌트
+            try { mgrStream.getVideoTracks().forEach(t => { t.contentHint = 'detail'; }); } catch (e) {}
             mgrChunks = [];
-            // [안정화] 오디오 공유 여부에 맞는 코덱만 시도 (오디오 미공유 + 음성코덱 = 에러의 주범)
-            const hasAudio = mgrStream.getAudioTracks().length > 0;
-            const mimeCandidates = hasAudio ? [
-                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-                'video/mp4',
-                'video/webm;codecs=vp9,opus',
-                'video/webm'
-            ] : [
+            // 영상 전용 코덱만 시도 (오디오 녹화 안 함)
+            const mimeCandidates = [
                 'video/mp4;codecs=avc1.42E01E',
                 'video/mp4',
                 'video/webm;codecs=vp9',
@@ -912,7 +909,7 @@
             for (const mime of mimeCandidates) {
                 if (!MediaRecorder.isTypeSupported(mime)) continue;
                 try {
-                    mgrRecorder = new MediaRecorder(mgrStream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+                    mgrRecorder = new MediaRecorder(mgrStream, { mimeType: mime, videoBitsPerSecond: 14000000 });
                     const isMp4 = mime.startsWith('video/mp4');
                     mgrRecorder._ext = isMp4 ? 'mp4' : 'webm';
                     mgrRecorder._mime = isMp4 ? 'video/mp4' : 'video/webm';
@@ -924,7 +921,6 @@
                 if (hint) hint.innerHTML = 'Recording failed: ' + ((lastErr && lastErr.name) || 'unsupported') + '.<br>Try updating Chrome.';
                 return;
             }
-            if (hint && !hasAudio) hint.innerHTML = 'No tab audio shared \u2014 recording video only.';
             mgrRecorder.ondataavailable = (e) => { if (e.data && e.data.size) mgrChunks.push(e.data); };
             mgrRecorder.onstop = () => {
                 clearInterval(mgrTimer); mgrTimer = null; mgrSec = 0;
@@ -1089,6 +1085,10 @@
                 try {
                     if (!window.CrazyGames || !window.CrazyGames.SDK) return;
                     await window.CrazyGames.SDK.init();
+                    // 실제 크레이지게임즈 환경일 때만 CG 모드 활성화
+                    // (SDK는 외부 사이트에서도 init이 성공하며 environment가 'local'/'disabled'로 표시됨)
+                    const env = window.CrazyGames.SDK.environment;
+                    if (env !== 'crazygames') { console.log('[CG] environment:', env, '→ CG mode off'); return; }
                     this.ready = true;
                     document.body.classList.add('cg-platform'); // 자체 로그인 UI 숨김 (게스트 전용)
                     this.watchViewport(); // 프레임 크기에 맞춰 자동 축소
