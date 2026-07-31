@@ -214,6 +214,19 @@
             color: #5865F2; animation: none; filter: none;
         }
 
+        /* [SCORE] 보너스 피드 토스트 */
+        #bonus-feed {
+            position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+            z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 4px;
+            pointer-events: none; select: none;
+        }
+        .bonus-toast {
+            font-weight: 900; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+            background: rgba(255,255,255,0.92); border: 1px solid #e5e7eb; padding: 3px 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); white-space: nowrap;
+        }
+        .bonus-toast .amt { color: #00a01c; }
+
         /* [HEART] 하트 버튼: 누르는 동안 움츠렸다가 떼면 튕김 */
         .heart-btn .heart-svg { transition: transform 0.08s ease; }
         .heart-btn:active .heart-svg { transform: scale(0.72); }
@@ -416,6 +429,7 @@
     </button>
 
     <!-- 모바일 채팅: 상단 메시지 오버레이 -->
+    <div id="bonus-feed"></div>
     <div id="mob-chat-feed" class="md:hidden fixed left-2 right-2 z-[82] flex flex-col gap-1 pointer-events-none select-none"
          style="display:none; top: calc(env(safe-area-inset-top) + 8px); max-height: 35vh; overflow: hidden;"></div>
 
@@ -2280,13 +2294,48 @@
             if (gameData.status === 'playing') runClientTimer(gameData.turnDeadline, gameData);
         }
 
+        // [SCORE] 턴 정산 후 보너스 토스트 (내 것 강조, 순차 등장 → 떠오르며 사라짐)
+        const COLOR_HEX = { R: '#ff0000', Y: '#c9b400', B: '#0000ff' };
+        function showBonusFeed(gameData) {
+            let bonuses = [];
+            try { bonuses = JSON.parse(gameData.lastRoundBonuses || '[]'); } catch (e) {}
+            if (!bonuses.length) return;
+            const feed = document.getElementById('bonus-feed');
+            if (!feed) return;
+            // 지배(DOM) 등 조용한 점수는 제외하고 스타일 보너스만 연출 (CLAIM은 너무 흔해서 내 것만)
+            const show = bonuses.filter(b => b.type !== 'CLAIM' || b.pid === userId).slice(0, 6);
+            show.forEach((b, i) => {
+                setTimeout(() => {
+                    const mine = b.pid === userId;
+                    const name = mine ? 'YOU' : ((gameData.players[b.pid] || {}).nickname || '').slice(0, 8);
+                    const el = document.createElement('div');
+                    el.className = 'bonus-toast';
+                    el.style.color = COLOR_HEX[b.color] || '#111';
+                    if (mine) el.style.borderColor = '#111';
+                    el.innerHTML = `${name} ${b.type} <span class="amt">+${b.amt}</span>`;
+                    feed.appendChild(el);
+                    el.animate([
+                        { opacity: 0, transform: 'translateY(8px) scale(0.9)' },
+                        { opacity: 1, transform: 'translateY(0) scale(1)' }
+                    ], { duration: 200, easing: 'ease-out' });
+                    setTimeout(() => {
+                        el.animate([
+                            { opacity: 1, transform: 'translateY(0)' },
+                            { opacity: 0, transform: 'translateY(-14px)' }
+                        ], { duration: 450, easing: 'ease-in' }).onfinish = () => el.remove();
+                    }, 1800);
+                }, i * 220);
+            });
+        }
+
         function triggerSequentialAnimations(events, gameData) {
             const myAnim = ++animGen; // [FREEZE-FIX] 새 애니메이션 시작 시 이전 잔여 타임아웃 무효화
             if (!events || events.length === 0) {
                 isAnimating = false; currentBoardState = pendingBoardState;
                 renderBoard(currentBoardState, gameData);
+                showBonusFeed(gameData);
                 if (gameData.status === 'finished') {
-                    setTimeout(() => { showWinner(gameData.players); }, 500);
+                    setTimeout(() => { showWinner(gameData.players, gameData); }, 500);
                 }
                 return;
             }
@@ -2336,8 +2385,9 @@
                 if (myAnim !== animGen) return; // [FREEZE-FIX]
                 isAnimating = false; currentBoardState = pendingBoardState;
                 renderBoard(currentBoardState, gameData);
+                showBonusFeed(gameData);
                 if (gameData.status === 'finished') {
-                     setTimeout(() => { showWinner(gameData.players); }, 300); 
+                     setTimeout(() => { showWinner(gameData.players, gameData); }, 300); 
                 }
             }, accumulatedDelay);
         }
@@ -2630,7 +2680,8 @@
                 }
                 const li = document.createElement('li');
                 li.className = "flex justify-between items-center p-3 bg-white border border-gray-100 shadow-sm";
-                li.innerHTML = `<div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full ${COLOR_MAP[colorCode].code}"></div><div class="flex flex-col"><span class="text-sm font-bold uppercase tracking-wider ${isMe ? 'text-black' : 'text-gray-600'}">${label}</span>${playerEntry ? `<span class="text-[10px] text-gray-400">BREAKERS: ${overwrites}</span>` : ''}</div></div><span class="font-mono font-black text-xl">${score}</span>`;
+                const ptsVal = playerEntry ? (playerEntry[1].pts || 0) : 0;
+                li.innerHTML = `<div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full ${COLOR_MAP[colorCode].code}"></div><div class="flex flex-col"><span class="text-sm font-bold uppercase tracking-wider ${isMe ? 'text-black' : 'text-gray-600'}">${label}</span>${playerEntry ? `<span class="text-[10px] text-gray-400">BREAKERS: ${overwrites}</span>` : ''}</div></div><div class="text-right"><span class="font-mono font-black text-xl">${score}</span>${playerEntry ? `<div class="font-mono font-black text-[11px] leading-none" style="color:#00a01c">${ptsVal} P</div>` : ''}</div>`;
                 scoreList.appendChild(li);
             });
         }
@@ -2659,21 +2710,28 @@
             return empties.length ? empties[Math.floor(Math.random()*empties.length)] : null;
         }
 
-        function showWinner(players) {
-             const sorted = Object.values(players).sort((a, b) => b.score - a.score);
+        function showWinner(players, gameData) {
+             // [점수제] 서버가 확정한 순위(place)와 결과(result) 사용, 없으면 칸 수 폴백
+             const entries = Object.values(players);
+             const sorted = entries.every(p => p.place)
+                 ? entries.slice().sort((a, b) => a.place - b.place)
+                 : entries.slice().sort((a, b) => b.score - a.score);
              const winner = sorted[0];
-             const topTied = sorted.filter(p => p.score === winner.score);
-             const isDraw = topTied.length > 1;
+             const isDraw = (players[userId]?.result === 'D') || sorted.filter(p => p.result === 'D').length > 1;
              const myScore = players[userId]?.score || 0;
-             const iAmTop = players[userId] && players[userId].score === winner.score;
+             const myPts = players[userId]?.pts || 0;
+             const iAmTop = players[userId] && (players[userId].place ? players[userId].place === 1 : players[userId].score === winner.score);
+             const endedBy = (gameData && gameData.endedBy) || '';
              let title, content;
              if (isDraw) {
-                 title = iAmTop ? "DRAW" : "GAME OVER";
-                 content = `DRAW: ${topTied.map(p => p.nickname).join(" & ")} (${winner.score})\nYOUR SCORE: ${myScore}`;
+                 title = "DRAW";
+                 content = `DRAW (${winner.score})\nYOUR SCORE: ${myScore}  ·  +${myPts} P`;
              } else {
                  title = iAmTop ? "VICTORY" : "GAME OVER";
-                 content = `WINNER: ${winner.nickname} (${winner.score})\nYOUR SCORE: ${myScore}`;
+                 content = `WINNER: ${winner.nickname} (${winner.score})\nYOUR SCORE: ${myScore}  ·  +${myPts} P`;
+                 if (endedBy.includes('PTS_TIEBREAK')) content += `\nTIE BROKEN BY POINTS!`;
              }
+             if (endedBy.includes('STALEMATE')) content += `\n(STALEMATE — 3 TURNS NO CHANGE)`;
              if (myAccountName) setTimeout(loadMyRecord, 1500);
              // 좋아요: AI가 아닌 상대들에게 하트 보내기
              const heartsWrap = document.getElementById('modal-hearts');
