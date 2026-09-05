@@ -361,38 +361,66 @@
         #gs-out{margin-top:10px;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;font:900 10px/1.5 ui-monospace,monospace;color:#00a01c;word-break:break-all}
 
 
-        /* ==================== [GLASS-PERF] 성능 모드 ====================
-           모바일에서 느린 3대 원인 제거:
-           ① 25개 타일의 backdrop-filter(가장 비쌈) ② 비활성 배경 레이어 9개가 계속 그려짐
-           ③ 커서 이동마다 25칸 conic-gradient 재계산 */
-        /* 비활성 배경 레이어는 아예 그리지 않음 (전 기기 공통 이득) */
+        /* ==================== [GLASS-PERF] 성능 모드 (공격적) ====================
+           모바일 저하/멈춤의 3대 원인을 아예 제거:
+           ① backdrop-filter 전면 제거(가장 비쌈) ② 마스크 합성 제거 ③ 전체화면 블러 애니메이션 제거 */
         .gs-layer:not(.on){display:none}
-        /* 성능 모드: 타일에서 backdrop-filter 제거, 불투명 색으로 대체 */
-        body.gs-perf #game-board .cell{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-        body.gs-perf #game-board .cell.bg-white{background:rgba(255,255,255,.16)!important}
-        body.gs-perf #game-board .cell.bg-player-red{background:rgba(255,0,40,calc(var(--ta)*.92 + .08))!important}
-        body.gs-perf #game-board .cell.bg-player-yellow{background:rgba(255,230,0,calc(var(--ta)*.92 + .08))!important}
-        body.gs-perf #game-board .cell.bg-player-blue{background:rgba(10,10,255,calc(var(--ta)*.92 + .08))!important}
-        /* 성능 모드: 타일 가장자리 빛을 고정 방향 그라데이션으로 (conic + mask 제거) */
-        body.gs-perf #game-board .cell::after{
-          background:linear-gradient(135deg, rgba(255,255,255,var(--edge)) 0%, rgba(255,255,255,calc(var(--edge)*.08)) 45%, rgba(255,255,255,calc(var(--edge)*.5)) 100%);
-        }
-        /* 성능 모드: 패널/버튼 흐림 완화 */
+
+        /* ① 흐림 전면 제거 → 반투명 단색으로 대체 (겉보기 차이 작고 부하는 급감) */
+        body.gs-perf #game-container,
+        body.gs-perf #game-board,
+        body.gs-perf #game-board .cell,
         body.gs-perf .bg-white:not(#game-container):not(.cell),
         body.gs-perf .bg-gray-50, body.gs-perf .bg-gray-100, body.gs-perf .bg-gray-200,
         body.gs-perf .modal-content, body.gs-perf #record-section,
-        body.gs-perf button:not(.gs-ui):not(#gs-open){
-          backdrop-filter:blur(calc(var(--gBlur) * .35)) saturate(var(--gSat));
-          -webkit-backdrop-filter:blur(calc(var(--gBlur) * .35)) saturate(var(--gSat));
+        body.gs-perf button:not(.gs-ui):not(#gs-open),
+        body.gs-perf input, body.gs-perf textarea{
+          backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
         }
-        body.gs-perf #game-container, body.gs-perf #game-board{
-          backdrop-filter:blur(calc(var(--gBlur) * .45)) saturate(var(--gSat));
-          -webkit-backdrop-filter:blur(calc(var(--gBlur) * .45)) saturate(var(--gSat));
+        body.gs-perf #game-container{background:rgba(18,20,32,calc(var(--cardAlpha) + .30))!important}
+        body.gs-perf #game-board{background:rgba(18,20,32,.22)!important}
+        body.gs-perf .bg-white:not(#game-container):not(.cell),
+        body.gs-perf .bg-gray-50, body.gs-perf .bg-gray-100, body.gs-perf .bg-gray-200,
+        body.gs-perf .modal-content, body.gs-perf #record-section{background:rgba(255,255,255,.10)!important}
+        body.gs-perf button:not(.gs-ui):not(#gs-open){background:rgba(255,255,255,.12)!important}
+        body.gs-perf input, body.gs-perf textarea{background:rgba(255,255,255,.12)!important}
+
+        /* 타일: 불투명 색 (뒤 비침 없이도 유리 느낌은 테두리 하이라이트로 유지) */
+        body.gs-perf #game-board .cell.bg-white{background:rgba(255,255,255,.15)!important}
+        body.gs-perf #game-board .cell.bg-player-red{background:rgba(255,10,45,.96)!important}
+        body.gs-perf #game-board .cell.bg-player-yellow{background:rgba(252,226,0,.96)!important}
+        body.gs-perf #game-board .cell.bg-player-blue{background:rgba(20,25,255,.96)!important}
+
+        /* ② 마스크 합성(conic + mask-composite) 제거 → 테두리 빛은 inset 그림자로 */
+        body.gs-perf #game-board .cell::after{display:none!important}
+        body.gs-perf #game-board .cell{
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,calc(var(--hi, .8) * .9)),
+            inset 0 0 0 1px rgba(255,255,255,calc(var(--edge) * .45)),
+            0 var(--cellDepth) 0 rgba(255,255,255,.12),
+            0 calc(var(--cellDepth) + 4px) 10px rgba(0,0,0,var(--gShadow));
         }
-        /* 성능 모드: 배경 블롭 흐림 축소 (가장 큰 GPU 비용) */
-        body.gs-perf .gs-layer .blob,body.gs-perf .gs-layer .neon{filter:blur(calc(var(--bgBlur) * .5))}
-        body.gs-perf .gs-layer[data-bg="E"] .cone{filter:blur(40px)}
-        body.gs-perf .gs-layer .aur{filter:blur(28px)}
+        body.gs-perf #game-board .cell:active,
+        body.gs-perf #game-board .cell.gs-press{
+          box-shadow:inset 0 3px 8px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.5);
+        }
+
+        /* ③ 전체화면 블러 애니메이션 제거 → 정지된 그라데이션 (멈춤 현상의 주범) */
+        body.gs-perf .gs-layer *{animation:none!important;filter:none!important}
+        body.gs-perf .gs-layer[data-bg="E"]{background:
+            radial-gradient(ellipse at 22% 18%, #ff0f5e 0, transparent 46%),
+            radial-gradient(ellipse at 82% 26%, #00a3ff 0, transparent 46%),
+            radial-gradient(ellipse at 48% 88%, #ffb400 0, transparent 48%),
+            radial-gradient(ellipse at 12% 82%, #7b5cff 0, transparent 44%), #12101c}
+        body.gs-perf .gs-layer[data-bg="E"] .cone{display:none}
+        body.gs-perf .gs-layer[data-bg="A"] .blob,
+        body.gs-perf .gs-layer[data-bg="I"] .neon,
+        body.gs-perf .gs-layer[data-bg="F"] .tb{opacity:.85}
+        body.gs-perf .gs-layer[data-bg="C"] .aur,
+        body.gs-perf .gs-layer[data-bg="H"] .wave{opacity:.6}
+
+        /* 레이아웃 스래싱 완화 */
+        body.gs-perf #game-board .cell{will-change:auto;contain:paint}
 
         /* [SCORE] 보너스 피드 토스트 */
         #bonus-feed {
@@ -548,7 +576,10 @@
   // 활성 배경만 남기고 나머지는 즉시 제거 (초기 렌더 비용 절감)
   var _bg=_g.bg||'E';
   document.addEventListener('DOMContentLoaded',function(){
-    document.querySelectorAll('.gs-layer').forEach(function(l){ l.classList.toggle('on', l.dataset.bg===_bg); });
+    document.querySelectorAll('.gs-layer').forEach(function(l){
+      if(l.dataset.bg===_bg){ l.classList.add('on'); }
+      else { l.remove(); }          // 비활성 레이어는 DOM에서 제거 (합성 비용 0)
+    });
   });
 }catch(e){}</script>
 <div id="gs-bg">
@@ -2815,12 +2846,26 @@
                 for (const k in VAR){ if (P[k] !== undefined) R.setProperty(VAR[k][0], P[k] + VAR[k][1]); }
                 document.body.classList.toggle('glass-on', !!P.on);
                 document.body.classList.toggle('gs-perf', !!P.perf);
+                ensureLayer(P.bg);
                 document.querySelectorAll('.gs-layer').forEach(l => l.classList.toggle('on', l.dataset.bg === P.bg));
                 const pk = document.getElementById('gs-picks');
                 if (pk) pk.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.bg === P.bg));
                 const o = document.getElementById('gs-out'); if (o) o.textContent = JSON.stringify(P);
             }
             function syncSliders(){ for (const [sec,k] of SL){ const i = document.getElementById('gs-'+k); if (i){ const mul = SL.find(x=>x[1]===k)[3]; i.value = Math.round(P[k]*mul); const l = document.getElementById('gsv-'+k); if (l) l.textContent = P[k]; } } }
+            const BGHTML = {
+                A:'<div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div>',
+                B:'<div class="bar"></div><div class="bar"></div><div class="bar"></div>',
+                C:'<div class="aur"></div><div class="aur"></div><div class="aur"></div>',
+                D:'<div class="duo"></div>', E:'<div class="cone"></div>', F:'<div class="tb"></div><div class="grid"></div>',
+                G:'', H:'<div class="wave"></div><div class="wave"></div><div class="wave"></div>',
+                I:'<div class="neon"></div><div class="neon"></div><div class="neon"></div>' };
+            function ensureLayer(id){
+                const host = document.getElementById('gs-bg'); if (!host) return;
+                if (host.querySelector('.gs-layer[data-bg="'+id+'"]')) return;
+                const d = document.createElement('div'); d.className='gs-layer'; d.dataset.bg=id; d.innerHTML=BGHTML[id]||'';
+                host.appendChild(d);
+            }
             function buildBg(){
                 if (document.getElementById('gs-bg')) return;
                 const d = document.createElement('div'); d.id = 'gs-bg';
@@ -2888,7 +2933,7 @@
                 const bd = document.getElementById('game-board'); if (!bd) return;
                 bd.addEventListener('pointerdown', e => { const c = e.target.closest('.cell'); if (c) c.classList.add('gs-press'); });
                 const rel = e => { const c = e.target && e.target.closest ? e.target.closest('.cell') : null;
-                    if (c){ c.classList.remove('gs-press'); c.animate([{transform:'translateY('+P.cellDepth+'px)'},{transform:'translateY('+(-P.cellDepth*0.5)+'px)',offset:.45},{transform:'translateY(0)'}],{duration:280,easing:'cubic-bezier(.34,1.56,.64,1)'}); }
+                    if (c){ c.classList.remove('gs-press'); c.animate([{transform:'translateY('+P.cellDepth+'px)'},{transform:'translateY('+(-P.cellDepth*0.5)+'px)',offset:.45},{transform:'translateY(0)'}],{duration:P.perf?160:280,easing:'cubic-bezier(.34,1.56,.64,1)'}); }
                     else bd.querySelectorAll('.gs-press').forEach(x => x.classList.remove('gs-press')); };
                 bd.addEventListener('pointerup', rel); bd.addEventListener('pointercancel', rel); bd.addEventListener('pointerleave', rel);
                 window.addEventListener('pointermove', e => { if (P.perf) return; lx = e.clientX; ly = e.clientY; reqAngles(); });
@@ -2896,6 +2941,7 @@
                 // 셀이 교체되는 즉시 각도를 다시 칠해 끊김을 없앰.
                 if (window.MutationObserver){
                     new MutationObserver(muts => {
+                        if (P.perf) return;   // 성능 모드: 각도 계산 자체를 안 함
                         for (const m of muts){ if (m.addedNodes && m.addedNodes.length){ paintAngles(); break; } }
                     }).observe(bd, { childList:true });
                 }
