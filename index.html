@@ -393,7 +393,6 @@
         body.gs-perf #game-board .cell.bg-player-blue{background:rgba(20,25,255,.96)!important}
 
         /* ② 마스크 합성(conic + mask-composite) 제거 → 테두리 빛은 inset 그림자로 */
-        body.gs-perf #game-board .cell::after{display:none!important}
         body.gs-perf #game-board .cell{
           box-shadow:
             inset 0 1px 0 rgba(255,255,255,calc(var(--hi, .8) * .9)),
@@ -407,13 +406,6 @@
         }
 
         /* ③ 전체화면 블러 애니메이션 제거 → 정지된 그라데이션 (멈춤 현상의 주범) */
-        body.gs-perf .gs-layer *{animation:none!important;filter:none!important}
-        body.gs-perf .gs-layer[data-bg="E"]{background:
-            radial-gradient(ellipse at 22% 18%, #ff0f5e 0, transparent 46%),
-            radial-gradient(ellipse at 82% 26%, #00a3ff 0, transparent 46%),
-            radial-gradient(ellipse at 48% 88%, #ffb400 0, transparent 48%),
-            radial-gradient(ellipse at 12% 82%, #7b5cff 0, transparent 44%), #12101c}
-        body.gs-perf .gs-layer[data-bg="E"] .cone{display:none}
         body.gs-perf .gs-layer[data-bg="A"] .blob,
         body.gs-perf .gs-layer[data-bg="I"] .neon,
         body.gs-perf .gs-layer[data-bg="F"] .tb{opacity:.85}
@@ -592,8 +584,6 @@
 
         /* ==================== [PERF-MOBILE] 추가 최적화 ==================== */
         /* 무한 반복 장식 애니메이션은 성능 모드에서 정지 (지속 리페인트 제거) */
-        body.gs-perf .title-rainbow{animation:none!important;background-position:0 50%!important}
-        body.gs-perf .bg-waiting-rainbow{animation:none!important;background:linear-gradient(120deg,#ff0055,#ffb400,#00d97e,#00a3ff,#7b5cff)!important}
         body.gs-perf .breaker-shine{animation-duration:1.4s!important}
         /* 합성 레이어 격리 — 말판/카드가 서로의 리페인트를 유발하지 않게 */
         body.glass-on #game-board{contain:layout paint}
@@ -603,6 +593,72 @@
         body.gs-perf #game-board .cell{transition:transform .07s ease, box-shadow .07s ease}
         /* 화면 밖 요소는 렌더 건너뛰기 (지원 브라우저) */
         body.gs-perf #chat-list,body.gs-perf #wr-chat-list,body.gs-perf #gc-list{content-visibility:auto;contain-intrinsic-size:200px}
+
+
+        /* ==================== [LAYOUT-FIX] 칸 늘어남 방지 ====================
+           원인: 그리드 행이 auto라서 min-height(44px)·내용에 따라 특정 행이 늘어날 수 있었음.
+           행을 5등분으로 고정하고, 대기화면은 그리드 흐름에서 빼서 오버레이로 처리. */
+        #game-board{ grid-template-rows:repeat(5, minmax(0,1fr))!important; }
+        #game-board > .cell{ min-width:0!important; min-height:0!important; height:100%!important; align-self:stretch; }
+        #game-board > .col-span-5{ position:absolute!important; inset:0; z-index:3; border-radius:var(--gRadius); }
+
+        /* ==================== [PERF-V2] 모바일도 PC와 같은 그래픽 ====================
+           보이는 것은 유지하고, 안 보이는 비용만 제거한다. */
+        /* ① 색 타일은 불투명(--ta:1)이라 뒤 흐림이 어차피 안 보임 → 제거해도 시각 차이 0 */
+        body.gs-perf #game-board .cell.bg-player-red,
+        body.gs-perf #game-board .cell.bg-player-yellow,
+        body.gs-perf #game-board .cell.bg-player-blue{
+          backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+        }
+        /* ② 빈 칸은 투명이라 흐림이 실제로 보이므로 유지 */
+        body.gs-perf #game-board .cell.bg-white{
+          backdrop-filter:blur(3px) saturate(var(--ts))!important;
+          -webkit-backdrop-filter:blur(3px) saturate(var(--ts))!important;
+        }
+        /* ③ 패널·말판·카드의 유리 흐림은 그대로 유지 (a=0이라 흐림이 곧 유리 표현) */
+        body.gs-perf #game-container,
+        body.gs-perf #game-board,
+        body.gs-perf .bg-white:not(#game-container):not(.cell),
+        body.gs-perf .bg-gray-50, body.gs-perf .bg-gray-100, body.gs-perf .bg-gray-200,
+        body.gs-perf .modal-content, body.gs-perf #record-section{
+          backdrop-filter:blur(var(--gBlur)) saturate(var(--gSat))!important;
+          -webkit-backdrop-filter:blur(var(--gBlur)) saturate(var(--gSat))!important;
+          background:rgba(255,255,255,var(--gAlpha))!important;
+        }
+        body.gs-perf #game-container{background:rgba(255,255,255,var(--cardAlpha))!important}
+        body.gs-perf #game-board{
+          background:linear-gradient(180deg, rgba(8,10,20,calc(var(--boardTint) + .06)), rgba(8,10,20,var(--boardTint)))!important;
+        }
+        /* ④ 작은 요소(버튼·배지·입력창)만 흐림 제외 — 개수가 많고 유리감은 테두리로 유지됨 */
+        body.gs-perf button:not(.gs-ui):not(#gs-open),
+        body.gs-perf input, body.gs-perf textarea,
+        body.gs-perf #open-rooms-count, body.gs-perf #queue-count{
+          backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+          background:rgba(255,255,255,calc(var(--gAlpha) + .12))!important;
+        }
+        /* ⑤ 타일 가장자리 빛 링 복원 (각도만 고정 → 한 번 래스터화되어 저렴) */
+        body.gs-perf #game-board .cell::after{display:block!important}
+        body.gs-perf #game-board .cell{
+          box-shadow:0 var(--cellDepth) 0 rgba(255,255,255,.14), 0 calc(var(--cellDepth) + 6px) 16px rgba(0,0,0,var(--gShadow)), inset 0 1px 0 rgba(255,255,255,var(--gHi));
+        }
+        /* ⑥ 타이틀 무지개 복원 */
+        body.gs-perf .title-rainbow{animation:rainbowCycle 20s ease infinite!important}
+        body.gs-perf .bg-waiting-rainbow{animation:rainbowCycle 20s ease infinite!important}
+        /* ⑦ 배경 E: 회전은 유지하되 블러를 자식에 걸어 한 번만 래스터화 (핵심 최적화) */
+        .gs-layer[data-bg="E"] .cone{filter:none!important;background:none!important;will-change:transform;transform-style:flat}
+        .gs-layer[data-bg="E"] .cone::before{
+          content:'';position:absolute;inset:0;
+          background:conic-gradient(from 0deg,#ff0055,#ff9500,#ffee00,#00d97e,#00a3ff,#7b5cff,#ff0055);
+          filter:blur(70px);
+        }
+        body.gs-perf .gs-layer[data-bg="E"]{background:#0d0d12!important}
+        body.gs-perf .gs-layer[data-bg="E"] .cone{display:block!important;animation:gsspin calc(40s/var(--bgSpeed)) linear infinite!important}
+        body.gs-perf .gs-layer[data-bg="E"] .cone::before{filter:blur(48px)}
+        /* 다른 배경도 동일 원리: 블러는 자식, 애니메이션은 부모 */
+        body.gs-perf .gs-layer *{animation-play-state:running!important}
+        body.gs-perf .gs-layer .blob,body.gs-perf .gs-layer .neon,body.gs-perf .gs-layer .aur,body.gs-perf .gs-layer .tb{
+          filter:blur(calc(var(--bgBlur) * .6))!important;
+        }
 
         /* [SCORE] 보너스 피드 토스트 */
         #bonus-feed {
