@@ -422,6 +422,130 @@
         /* 레이아웃 스래싱 완화 */
         body.gs-perf #game-board .cell{will-change:auto;contain:paint}
 
+
+        /* [GLASS] 검은 배경 요소도 유리로 — 원래 흰 UI 위 대비용으로 bg-black 이던 것들
+           (메시지 모달, PLAY AGAIN 버튼, 방 만들기 확인, 모바일 채팅 바 등) */
+        body.glass-on .modal-content.bg-black\/70,
+        body.glass-on .bg-black,
+        body.glass-on #mob-chat-wrap.bg-black\/90{
+          background:rgba(255,255,255,calc(var(--gAlpha) + .10))!important;
+          backdrop-filter:blur(var(--gBlur)) saturate(var(--gSat));
+          -webkit-backdrop-filter:blur(var(--gBlur)) saturate(var(--gSat));
+          border:1px solid rgba(255,255,255,var(--gBorder))!important;
+          border-radius:var(--gRadius);
+          box-shadow:0 10px 30px rgba(0,0,0,var(--gShadow)), inset 0 1px 0 rgba(255,255,255,var(--gHi));
+          color:#fff!important;
+        }
+        /* 모달 뒤 어두운 막은 유지하되 살짝 옅게 (배경이 비치게) */
+        body.glass-on .bg-black\/40{background:rgba(6,8,16,.42)!important}
+        /* 성능 모드에선 흐림 없이 단색 */
+        body.gs-perf .modal-content.bg-black\/70,
+        body.gs-perf .bg-black,
+        body.gs-perf #mob-chat-wrap.bg-black\/90{
+          backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+          background:rgba(24,26,40,.92)!important;
+        }
+        body.gs-perf .bg-black\/40{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+
+        /* ==================== [GLASS-POLISH] 전수 정리 ====================
+           흰 배경 위 검은 글자를 전제로 만든 잔여 요소들을 유리 톤으로 통일 */
+
+        /* 1) 보너스 점수 토스트 — 흰 알약 → 글자만 (요청) */
+        body.glass-on .bonus-toast{
+          background:transparent!important;border:none!important;box-shadow:none!important;
+          color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.85), 0 0 22px rgba(0,0,0,.6);
+          font-size:15px;letter-spacing:.1em;
+        }
+        body.glass-on .bonus-toast .amt{color:#7cf5a0;text-shadow:0 2px 10px rgba(0,0,0,.9)}
+
+        /* 2) 인라인으로 박힌 어두운 글자색 강제 보정 */
+        body.glass-on [style*="color:#1a1a1a"],
+        body.glass-on [style*="color:#111"],
+        body.glass-on [style*="color:#000"]{color:#fff!important}
+        /* 마이레코드 W/L/D · 포인트 — 어두운 배경에서 밝게 */
+        body.glass-on [style*="color:#00c020"]{color:#7cf5a0!important}
+        body.glass-on [style*="color:#ff0000"]{color:#ff8497!important}
+        body.glass-on [style*="color:#8a8f98"]{color:rgba(255,255,255,.72)!important}
+        body.glass-on [style*="color:#00a01c"]{color:#7cf5a0!important}
+
+        /* 3) 플레이어 원색 텍스트 — 어두운 배경에서 잘 읽히게 밝은 톤으로 */
+        body.glass-on .text-player-red{color:#ff8497!important}
+        body.glass-on .text-player-yellow{color:#ffe86b!important}
+        body.glass-on .text-player-blue{color:#9aa8ff!important}
+        body.glass-on .text-rose-500{color:#ff9ab0!important}
+        body.glass-on .text-green-600,body.glass-on .text-green-500{color:#7cf5a0!important}
+        body.glass-on .text-red-500,body.glass-on .text-red-600{color:#ff8497!important}
+
+        /* 4) 대기 화면 무지개 바 — 유리 위에서 과하지 않게 */
+        body.glass-on .bg-waiting-rainbow{opacity:.85;border-radius:var(--gRadius)}
+
+        /* 5) HOW TO PLAY 튜토리얼 셀 / 랭크 차트 — 밝은 칩들 유리로 */
+        body.glass-on .tut-cell{
+          background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.35)!important;
+          border-radius:calc(var(--gRadius) * .7);color:#fff!important;
+        }
+        body.glass-on .tut-cell.bg-player-red{background:rgba(255,0,40,.72)!important}
+        body.glass-on .tut-cell.bg-player-yellow{background:rgba(255,230,0,.72)!important}
+        body.glass-on .tut-cell.bg-player-blue{background:rgba(10,10,255,.72)!important}
+
+        /* 6) 구분선·테두리 톤 통일 */
+        body.glass-on hr,body.glass-on .divide-y > * + *{border-color:rgba(255,255,255,.18)!important}
+        body.glass-on .shadow-lg,body.glass-on .shadow-xl,body.glass-on .shadow-2xl,body.glass-on .shadow-sm,body.glass-on .shadow-inner{
+          box-shadow:0 10px 30px rgba(0,0,0,var(--gShadow)), inset 0 1px 0 rgba(255,255,255,calc(var(--gHi) * .8))!important;
+        }
+        /* 7) 스크롤바 */
+        body.glass-on ::-webkit-scrollbar{width:6px;height:6px}
+        body.glass-on ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.28);border-radius:3px}
+        body.glass-on ::-webkit-scrollbar-track{background:transparent}
+
+        /* 8) 타이머 게이지 — 흰 바탕 → 유리 */
+        body.glass-on .timer-bar{background:rgba(255,255,255,.18)!important;border-radius:3px;overflow:hidden}
+        body.glass-on .timer-bar > div{background:#fff!important}
+
+        /* 9) 텍스트 가독성 (배경이 밝은 계열일 때 대비) */
+        body.glass-on #game-container{text-shadow:0 1px 3px rgba(0,0,0,.35)}
+        body.glass-on .title-rainbow{text-shadow:none}
+
+
+        /* [GLASS-POLISH2] 색 배지·색 버튼 — 진한 단색 → 유리 톤 (해당 색은 글자/테두리로 유지) */
+        body.glass-on #open-rooms-count,
+        body.glass-on #queue-count,
+        body.glass-on .bg-blue-600,
+        body.glass-on .bg-blue-500{
+          background:rgba(120,160,255,.18)!important;color:#bcd0ff!important;
+          border:1px solid rgba(150,180,255,.5)!important;border-radius:calc(var(--gRadius) * .8);
+          box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
+        }
+        body.glass-on .bg-green-500,body.glass-on .bg-green-600,body.glass-on .bg-emerald-500{
+          background:rgba(90,240,150,.16)!important;color:#8ff5b6!important;
+          border:1px solid rgba(120,245,170,.5)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+        }
+        body.glass-on .bg-red-500,body.glass-on .bg-red-600{
+          background:rgba(255,90,120,.16)!important;color:#ff9fb0!important;
+          border:1px solid rgba(255,130,155,.5)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+        }
+        body.glass-on .bg-yellow-400,body.glass-on .bg-yellow-500,body.glass-on .bg-amber-400{
+          background:rgba(255,225,90,.18)!important;color:#ffe98a!important;
+          border:1px solid rgba(255,230,120,.55)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+        }
+        /* 위 규칙이 글자색을 덮으므로, 흰 글자 지정된 배지는 원래 의도대로 밝게 */
+        body.glass-on .bg-blue-600.text-white,body.glass-on .bg-green-500.text-white,
+        body.glass-on .bg-red-500.text-white,body.glass-on .bg-red-600.text-white{color:#fff!important}
+        body.glass-on .bg-yellow-400.text-black{color:#ffeaa0!important}
+        /* 방 목록 항목 (파란 톤 배경) */
+        body.glass-on .bg-blue-50\/50,body.glass-on .bg-blue-50,body.glass-on .bg-blue-100{
+          background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.22)!important;
+        }
+        body.glass-on .border-blue-100,body.glass-on .border-blue-600{border-color:rgba(150,180,255,.45)!important}
+        /* 초대 모달 상단 파란 띠 */
+        body.glass-on .bg-blue-900\/40{background:rgba(10,16,40,.45)!important}
+        /* 성능 모드: 배지도 흐림 없이 */
+        body.gs-perf #open-rooms-count,body.gs-perf #queue-count,
+        body.gs-perf .bg-blue-600,body.gs-perf .bg-green-500,body.gs-perf .bg-red-500,body.gs-perf .bg-yellow-400{
+          backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+        }
+
         /* [SCORE] 보너스 피드 토스트 */
         #bonus-feed {
             position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
@@ -2548,7 +2672,7 @@
                     const el = document.createElement('div');
                     el.className = 'bonus-toast';
                     el.style.color = COLOR_HEX[b.color] || '#111';
-                    if (mine) el.style.borderColor = '#111';
+                    if (mine) { el.style.borderColor = '#111'; el.style.fontSize = '17px'; el.style.filter = 'drop-shadow(0 0 10px rgba(255,255,255,.35))'; }
                     el.innerHTML = `${name} ${b.type} <span class="amt">+${b.amt}</span>`;
                     feed.appendChild(el);
                     el.animate([
