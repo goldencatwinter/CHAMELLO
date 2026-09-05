@@ -360,6 +360,40 @@
         #gs-json{width:100%;margin-top:8px;font:11px ui-monospace,monospace;padding:6px;border:1px solid #e5e7eb;color:#111}
         #gs-out{margin-top:10px;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;font:900 10px/1.5 ui-monospace,monospace;color:#00a01c;word-break:break-all}
 
+
+        /* ==================== [GLASS-PERF] 성능 모드 ====================
+           모바일에서 느린 3대 원인 제거:
+           ① 25개 타일의 backdrop-filter(가장 비쌈) ② 비활성 배경 레이어 9개가 계속 그려짐
+           ③ 커서 이동마다 25칸 conic-gradient 재계산 */
+        /* 비활성 배경 레이어는 아예 그리지 않음 (전 기기 공통 이득) */
+        .gs-layer:not(.on){display:none}
+        /* 성능 모드: 타일에서 backdrop-filter 제거, 불투명 색으로 대체 */
+        body.gs-perf #game-board .cell{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+        body.gs-perf #game-board .cell.bg-white{background:rgba(255,255,255,.16)!important}
+        body.gs-perf #game-board .cell.bg-player-red{background:rgba(255,0,40,calc(var(--ta)*.92 + .08))!important}
+        body.gs-perf #game-board .cell.bg-player-yellow{background:rgba(255,230,0,calc(var(--ta)*.92 + .08))!important}
+        body.gs-perf #game-board .cell.bg-player-blue{background:rgba(10,10,255,calc(var(--ta)*.92 + .08))!important}
+        /* 성능 모드: 타일 가장자리 빛을 고정 방향 그라데이션으로 (conic + mask 제거) */
+        body.gs-perf #game-board .cell::after{
+          background:linear-gradient(135deg, rgba(255,255,255,var(--edge)) 0%, rgba(255,255,255,calc(var(--edge)*.08)) 45%, rgba(255,255,255,calc(var(--edge)*.5)) 100%);
+        }
+        /* 성능 모드: 패널/버튼 흐림 완화 */
+        body.gs-perf .bg-white:not(#game-container):not(.cell),
+        body.gs-perf .bg-gray-50, body.gs-perf .bg-gray-100, body.gs-perf .bg-gray-200,
+        body.gs-perf .modal-content, body.gs-perf #record-section,
+        body.gs-perf button:not(.gs-ui):not(#gs-open){
+          backdrop-filter:blur(calc(var(--gBlur) * .35)) saturate(var(--gSat));
+          -webkit-backdrop-filter:blur(calc(var(--gBlur) * .35)) saturate(var(--gSat));
+        }
+        body.gs-perf #game-container, body.gs-perf #game-board{
+          backdrop-filter:blur(calc(var(--gBlur) * .45)) saturate(var(--gSat));
+          -webkit-backdrop-filter:blur(calc(var(--gBlur) * .45)) saturate(var(--gSat));
+        }
+        /* 성능 모드: 배경 블롭 흐림 축소 (가장 큰 GPU 비용) */
+        body.gs-perf .gs-layer .blob,body.gs-perf .gs-layer .neon{filter:blur(calc(var(--bgBlur) * .5))}
+        body.gs-perf .gs-layer[data-bg="E"] .cone{filter:blur(40px)}
+        body.gs-perf .gs-layer .aur{filter:blur(28px)}
+
         /* [SCORE] 보너스 피드 토스트 */
         #bonus-feed {
             position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
@@ -504,7 +538,19 @@
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-2 md:p-8 glass-on" onclick="window.SoundManager && SoundManager.init()">
 <!-- [GLASS] 배경/유리를 첫 페인트부터 적용 (JS 로딩 전 흰 화면 방지). 저장된 설정이 유리 OFF면 아래 스크립트가 즉시 해제 -->
-<script>try{var _g=JSON.parse(localStorage.getItem('chamello_glass')||'{}');if(_g.on===0)document.body.classList.remove('glass-on');if(_g.bg)document.documentElement.setAttribute('data-bg',_g.bg);}catch(e){}</script>
+<script>try{
+  var _g=JSON.parse(localStorage.getItem('chamello_glass')||'{}');
+  if(_g.on===0)document.body.classList.remove('glass-on');
+  if(_g.bg)document.documentElement.setAttribute('data-bg',_g.bg);
+  // 터치 기기는 성능 모드로 시작 (저장값이 있으면 그것을 우선)
+  var _p=(_g.perf!==undefined)?_g.perf:(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches?1:0);
+  if(_p)document.body.classList.add('gs-perf');
+  // 활성 배경만 남기고 나머지는 즉시 제거 (초기 렌더 비용 절감)
+  var _bg=_g.bg||'E';
+  document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('.gs-layer').forEach(function(l){ l.classList.toggle('on', l.dataset.bg===_bg); });
+  });
+}catch(e){}</script>
 <div id="gs-bg">
   <div class="gs-layer" data-bg="A"><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div></div>
   <div class="gs-layer" data-bg="B"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
@@ -2730,7 +2776,8 @@
             const DEF = { on:1, bg:'E',
                 bw:701, gap:2, bp:4, r:6, ta:1, ts:0, edge:1, ew:1, cellDepth:3,
                 a:0, b:40, s:0.9, bd:0.55, hi:0.8, sh:0.2, d:1,
-                bgSpeed:2.5, bgSat:1, bgBright:1, bgBlur:60, uiScale:1, cardAlpha:0 };
+                bgSpeed:2.5, bgSat:1, bgBright:1, bgBlur:60, uiScale:1, cardAlpha:0,
+                perf:(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0 };
             const P = Object.assign({}, DEF);
             try { const v = localStorage.getItem('chamello_glass'); if (v) Object.assign(P, JSON.parse(v)); } catch (e) {}
             const SL = [
@@ -2767,6 +2814,7 @@
                 const R = document.documentElement.style;
                 for (const k in VAR){ if (P[k] !== undefined) R.setProperty(VAR[k][0], P[k] + VAR[k][1]); }
                 document.body.classList.toggle('glass-on', !!P.on);
+                document.body.classList.toggle('gs-perf', !!P.perf);
                 document.querySelectorAll('.gs-layer').forEach(l => l.classList.toggle('on', l.dataset.bg === P.bg));
                 const pk = document.getElementById('gs-picks');
                 if (pk) pk.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.bg === P.bg));
@@ -2792,7 +2840,7 @@
                 if (document.getElementById('gs-drawer')) return;
                 const dr = document.createElement('div'); dr.id = 'gs-drawer';
                 let h = '<h4 style="margin-top:0">CHAMELLO 유리 설정 <span style="color:#9ca3af;font-weight:700">Ctrl+Alt+Enter</span></h4>';
-                h += '<div class="row"><button id="gs-toggle">유리 ON/OFF</button></div>';
+                h += '<div class="row"><button class="gs-ui" id="gs-toggle">유리 ON/OFF</button><button class="gs-ui" id="gs-perf">성능 모드</button></div>';
                 h += '<h4>배경 선택</h4><div id="gs-picks">';
                 for (const k in BGN) h += '<button class="gs-ui" data-bg="'+k+'" title="'+BGN[k]+'">'+k+'</button>';
                 h += '</div>';
@@ -2810,6 +2858,10 @@
                 }
                 dr.querySelectorAll('#gs-picks button').forEach(b => b.onclick = () => { P.bg = b.dataset.bg; apply(); });
                 document.getElementById('gs-toggle').onclick = () => { P.on = P.on ? 0 : 1; apply(); };
+                const perfBtn = document.getElementById('gs-perf');
+                const paintPerf = () => { perfBtn.style.background = P.perf ? '#111' : '#fff'; perfBtn.style.color = P.perf ? '#fff' : '#111'; };
+                perfBtn.onclick = () => { P.perf = P.perf ? 0 : 1; apply(); paintPerf(); if (!P.perf) reqAngles(); };
+                paintPerf();
                 document.getElementById('gs-save').onclick = () => { try { localStorage.setItem('chamello_glass', JSON.stringify(P)); alert('저장됨'); } catch(e){} };
                 document.getElementById('gs-reset').onclick = () => { Object.assign(P, DEF); syncSliders(); apply(); };
                 document.getElementById('gs-copy').onclick = () => { const t = JSON.stringify(P); document.getElementById('gs-json').value = t; try { navigator.clipboard.writeText(t); } catch(e){} };
@@ -2821,6 +2873,7 @@
             let lx = null, ly = null, angRaf = null;
             function paintAngles(){
                 angRaf = null;
+                if (P.perf) return;   // 성능 모드: 고정 방향 그라데이션 사용
                 const bd = document.getElementById('game-board'); if (!bd) return;
                 // 마우스가 아직 안 움직였으면 말판 중심 기준 기본 광원 위치 사용 (첫 렌더도 자연스럽게)
                 if (lx === null){ const b = bd.getBoundingClientRect(); lx = b.left + b.width*0.3; ly = b.top - b.height*0.25; }
@@ -2838,7 +2891,7 @@
                     if (c){ c.classList.remove('gs-press'); c.animate([{transform:'translateY('+P.cellDepth+'px)'},{transform:'translateY('+(-P.cellDepth*0.5)+'px)',offset:.45},{transform:'translateY(0)'}],{duration:280,easing:'cubic-bezier(.34,1.56,.64,1)'}); }
                     else bd.querySelectorAll('.gs-press').forEach(x => x.classList.remove('gs-press')); };
                 bd.addEventListener('pointerup', rel); bd.addEventListener('pointercancel', rel); bd.addEventListener('pointerleave', rel);
-                window.addEventListener('pointermove', e => { lx = e.clientX; ly = e.clientY; reqAngles(); });
+                window.addEventListener('pointermove', e => { if (P.perf) return; lx = e.clientX; ly = e.clientY; reqAngles(); });
                 // [움찔 방지] renderBoard 가 셀을 전부 새로 만들면 --ang 이 사라져 빛이 기본각(45°)으로 튐.
                 // 셀이 교체되는 즉시 각도를 다시 칠해 끊김을 없앰.
                 if (window.MutationObserver){
