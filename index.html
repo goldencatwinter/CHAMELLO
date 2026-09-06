@@ -228,7 +228,7 @@
           /* 말판 (board_glass_demo 확정값) */
           --bw:701px; --gap:2px; --bp:4px; --gRadius:6px;
           --ta:1; --ts:0; --edge:1; --edgeW:1px; --cellDepth:4px;
-          --boardTint:.01; --tileDepth:.06; --tileGloss:0; --tileTex:.25; --emptyAlpha:0;
+          --boardTint:.01; --tileDepth:.06; --tileGloss:0; --tileTex:0; --emptyAlpha:0;
           --tileTexMobile:0;   /* 모바일 질감 세기 (0 = 빗금 없음) */
           --texActive:var(--tileTex);
           /* UI 유리 (ui_glass_demo 확정값) */
@@ -3126,10 +3126,20 @@
                 bw:701, gap:2, bp:4, r:6, ta:1, ts:0, edge:1, ew:1, cellDepth:4,
                 a:0, b:40, s:0.9, bd:0.55, hi:0.8, sh:0.2, d:1,
                 bgSpeed:2.5, bgSat:1, bgBright:1, bgBlur:60, uiScale:1, cardAlpha:0,
-                boardTint:0.01, tileDepth:0.06, tileGloss:0, tileTex:0.25, tileTexMobile:0, emptyAlpha:0,
+                boardTint:0.01, tileDepth:0.06, tileGloss:0, tileTex:0, tileTexMobile:0, emptyAlpha:0,
                 perf:(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0 };
             const P = Object.assign({}, DEF);
             try { const v = localStorage.getItem('chamello_glass'); if (v) Object.assign(P, JSON.parse(v)); } catch (e) {}
+            // [FIX] 흰 빗금 제거: 이전에 저장된 질감 값이 있으면 0으로 정리 (1회)
+            try {
+                if (!localStorage.getItem('chamello_glass_tex0')) {
+                    P.tileTex = 0; P.tileTexMobile = 0;
+                    localStorage.setItem('chamello_glass_tex0', '1');
+                    const cur = JSON.parse(localStorage.getItem('chamello_glass') || '{}');
+                    cur.tileTex = 0; cur.tileTexMobile = 0;
+                    localStorage.setItem('chamello_glass', JSON.stringify(cur));
+                }
+            } catch (e) {}
             // [PERF] 모바일은 저장된 설정과 무관하게 항상 성능 모드 (끊김·발열 방지)
             const IS_MOBILE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 900;
             if (IS_MOBILE) P.perf = 1;
