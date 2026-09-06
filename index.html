@@ -229,6 +229,8 @@
           --bw:701px; --gap:2px; --bp:4px; --gRadius:6px;
           --ta:1; --ts:0; --edge:1; --edgeW:1px; --cellDepth:4px;
           --boardTint:.01; --tileDepth:.06; --tileGloss:0; --tileTex:.25; --emptyAlpha:0;
+          --tileTexMobile:0;   /* 모바일 질감 세기 (0 = 빗금 없음) */
+          --texActive:var(--tileTex);
           /* UI 유리 (ui_glass_demo 확정값) */
           --gAlpha:0; --gBlur:40px; --gSat:0.9; --gBorder:0.55; --gHi:0.8; --gShadow:0.2; --gDepth:1px;
           --bgSpeed:2.5; --bgSat:1; --bgBright:1; --bgBlur:60px;
@@ -565,14 +567,14 @@
         /* 타일: 색 위에 어두운 하단 그라데이션 → 유리 두께처럼 아래가 진해짐 */
         body.glass-on #game-board .cell::before{
           content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
-          background:linear-gradient(180deg, rgba(255,255,255,calc(var(--tileGloss, .22))) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,calc(var(--tileDepth, .28))) 100%);
-        }
-        /* 미세 질감 (유리 표면 결) */
-        body.glass-on #game-board .cell{
           background-image:
-            repeating-linear-gradient(115deg, rgba(255,255,255,calc(var(--tileTex, .05))) 0 2px, rgba(255,255,255,0) 2px 5px);
-          background-blend-mode:overlay;
+            repeating-linear-gradient(115deg,
+              rgba(255,255,255,calc(var(--texActive, 0) * .14)) 0 1px,
+              rgba(0,0,0,calc(var(--texActive, 0) * .09)) 1px 2px,
+              rgba(255,255,255,0) 2px 7px),
+            linear-gradient(180deg, rgba(255,255,255,calc(var(--tileGloss, .22))) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,calc(var(--tileDepth, .28))) 100%);
         }
+        /* 미세 질감: blend-mode 의존 제거 — ::before 한 곳에서만 처리 (아래 참조) */
         /* 색 타일: 채도를 살짝 올리고 테두리를 색으로 — 대비 강화 */
         body.glass-on #game-board .cell.bg-player-red{box-shadow:inset 0 0 0 1px rgba(255,120,140,.55), inset 0 1px 0 rgba(255,255,255,var(--gHi)), 0 var(--cellDepth) 0 rgba(255,255,255,.12), 0 calc(var(--cellDepth) + 5px) 12px rgba(0,0,0,var(--gShadow))}
         body.glass-on #game-board .cell.bg-player-yellow{box-shadow:inset 0 0 0 1px rgba(255,245,150,.6), inset 0 1px 0 rgba(255,255,255,var(--gHi)), 0 var(--cellDepth) 0 rgba(255,255,255,.12), 0 calc(var(--cellDepth) + 5px) 12px rgba(0,0,0,var(--gShadow))}
@@ -663,12 +665,6 @@
           background-image:none!important;
           background-blend-mode:normal!important;
         }
-        body.gs-perf #game-board .cell::before{
-          background-image:
-            repeating-linear-gradient(115deg, rgba(255,255,255,calc(var(--tileTex, .05) * .8)) 0 2px, rgba(255,255,255,0) 2px 5px),
-            linear-gradient(180deg, rgba(255,255,255,calc(var(--tileGloss, .22))) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,calc(var(--tileDepth, .28))) 100%);
-        }
-
         /* ② 가장자리 빛: mask-composite 제거 → 두 겹 inset 그림자로 같은 링 표현 */
         body.gs-perf #game-board .cell::after{
           -webkit-mask:none!important;mask:none!important;background:none!important;
@@ -693,6 +689,7 @@
         /* ==================== [MOBILE-GUARD] 최종 안전장치 ====================
            모바일에서 렌더 깨짐을 유발하는 조합을 전역 차단.
            (부모 transform + 자식 backdrop-filter, mask-composite, blend-mode) */
+        body.gs-perf{ --texActive:var(--tileTexMobile); }
         body.gs-perf *{ background-blend-mode:normal!important; mix-blend-mode:normal!important; }
         body.gs-perf #game-board, body.gs-perf #game-board *{ contain:none!important; }
         body.gs-perf #game-container{ transform:none!important; }
@@ -739,7 +736,7 @@
         body.cg-platform #account-btn { display: none !important; }
 
         /* [CG-SDK] 크레이지게임즈 버전: Play as Guest를 메인 버튼으로 승격 (최상단, How to Play 위) */
-        body.cg-platform #guest-link {
+        body.cg-platform #quick-play {
             order: -1;
             align-self: stretch;
             width: 100%;
@@ -754,7 +751,7 @@
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.15);
             transition: background-color 0.15s ease;
         }
-        body.cg-platform #guest-link:hover { background: #1f2937; color: #fff; }
+        body.cg-platform #quick-play:hover { background: #1f2937; color: #fff; }
 
         /* [CG-SDK] 크레이지게임즈 프레임에 맞춰 게임 전체 자동 축소 시 */
         body.cg-scaled {
@@ -874,7 +871,7 @@
 
     <div id="message-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center pointer-events-none">
         <div class="modal-content pointer-events-auto bg-black/70 border border-white/40 p-6 w-[80%] max-w-sm text-center backdrop-blur-md shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] rounded-xl relative">
-            <button onclick="document.getElementById('message-modal').classList.add('hidden')" class="absolute top-2 right-3 text-white text-2xl font-bold p-1 leading-none hover:text-gray-300">&times;</button>
+            <button onclick="window.closeMessageModal()" class="absolute top-2 right-3 text-white text-2xl font-bold p-1 leading-none hover:text-gray-300">&times;</button>
             
             <h3 id="modal-title" class="text-2xl font-black uppercase mb-3 tracking-tighter text-white drop-shadow-md">TITLE</h3>
             <p id="modal-content" class="text-white mb-4 font-bold whitespace-pre-line leading-relaxed text-sm drop-shadow-sm">Content</p>
@@ -1042,7 +1039,7 @@
             <div class="mb-6 flex justify-between items-end">
                 <div class="flex items-center gap-3 md:gap-4">
                     <div>
-                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter title-rainbow leading-none" ondblclick="location.reload()" title="Double-click: Restart" style="cursor:pointer; user-select:none; -webkit-user-select:none;">CHAMELLO</h1>
+                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter title-rainbow leading-none" onclick="window.goHome()" ondblclick="location.reload()" title="Click: Main menu (not during a game) · Double-click: Restart" style="cursor:pointer; user-select:none; -webkit-user-select:none;">CHAMELLO</h1>
                         <p class="text-[9px] md:text-[11px] font-bold text-gray-400 uppercase tracking-[0.22em] mt-1.5 pl-0.5">Tri-Color Territory Battle</p>
                     </div>
                     <div id="title-cham" class="chamello-icon cham-mask shrink-0 self-center" ondblclick="window.openRanks()" title="Double-click: Rank Chart"></div>
@@ -1105,10 +1102,7 @@
                         <p id="quick-play-sub" class="self-center text-[9px] font-bold uppercase tracking-[0.18em] -mt-1" style="color:rgba(255,255,255,.55)">
                             No signup &middot; Instant AI match
                         </p>
-                        <button id="guest-link"
-                                class="self-center text-[10px] text-gray-400 hover:text-black font-bold uppercase tracking-[0.2em] underline underline-offset-2 mt-1 transition-colors">
-                            Play as guest
-                        </button>
+
                         <a id="discord-link" href="https://discord.gg/rJTPHf2teY" target="_blank" rel="noopener"
                            class="discord-btn self-center inline-flex items-center gap-1.5 mt-1 text-[10px] font-black uppercase tracking-[0.2em]">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
@@ -1895,6 +1889,7 @@
             if (b) b.style.width = w;
         }
         let lastTimerValue = ""; 
+        let currentGameStatus = null;   // [UX] 모달 X 처리에 사용
         // [틱 스케줄러] 턴(마감시각)별 틱 상태: 숫자가 내려갈 때만, 숫자당 1회만 틱
         let tickTurnKey = null, tickLastNum = null;
         let turnCountAnchor = null; // [앵커 카운트] 이 턴의 카운트가 화면에 나타난 시각 — 표시는 여기서부터 정확히 1초 간격
@@ -2378,6 +2373,26 @@
             }
         }
 
+        // ===== [UX] 홈으로 돌아가기 / 모달 닫기 =====
+        // 게임 종료 후 X 를 누르면 모달만 닫혀 아무것도 못 하던 문제 해결:
+        // 게임 중/종료 상태면 방을 정리하고 로비로 복귀시킨다.
+        window.goHome = (force) => {
+            // [안전장치] 진행 중인 게임에서는 동작하지 않음 — 실수로 눌러 판을 날리거나
+            // 탈주 패배로 기록되는 것을 방지. (종료된 게임/대기방/로비에서만 복귀)
+            if (!force && currentGameStatus === 'playing') return;
+            try { document.getElementById('message-modal').classList.add('hidden'); } catch (e) {}
+            if (gameId) {
+                try { callFn('leaveGame', { gameId }); } catch (e) {}   // 서버 정리는 기다리지 않음
+            }
+            resetLocalStateAndUI();
+            if (window.SoundManager && window.SoundManager.playClick) window.SoundManager.playClick();
+        };
+        window.closeMessageModal = () => {
+            document.getElementById('message-modal').classList.add('hidden');
+            // 게임이 끝난 상태에서 닫으면 로비로 (그대로 두면 조작 불가)
+            if (gameId && currentGameStatus === 'finished') window.goHome(true);
+        };
+
         joinBtn.addEventListener('click', async () => {
             const val = nicknameInput.value.trim();
             if(!val) return;
@@ -2516,7 +2531,7 @@
             
             queueDocId = null; gameId = null; myColor = null; myOverwritesLeft = MAX_OVERWRITES;
             lastProcessedTurn = 0; isAnimating = false; pendingBoardState = null; pendingGameEndData = null;
-            selectedCell = null; isResolving = false; lastTimerValue = ""; isMoveCommitted = false; 
+            selectedCell = null; isResolving = false; lastTimerValue = ""; isMoveCommitted = false; currentGameStatus = null; 
             tickTurnKey = null; tickLastNum = null; turnCountAnchor = null;
             myNickname = ""; selectedFriendIds.clear(); isWaitingRoomHost = false; myHostedRoomName = "";
             currentInvitedGameId = null;
@@ -2602,6 +2617,7 @@
         };
 
         function handleGameUpdate(gameData) {
+            currentGameStatus = gameData.status;
             if (gameData.status === 'waiting' && gameData.hostId === userId) startRoomHeartbeat();
             else stopRoomHeartbeat();
             // [CG-SDK] 방 상태를 플랫폼에 공유 → 초대 버튼/친구 참여 활성화
@@ -3110,7 +3126,7 @@
                 bw:701, gap:2, bp:4, r:6, ta:1, ts:0, edge:1, ew:1, cellDepth:4,
                 a:0, b:40, s:0.9, bd:0.55, hi:0.8, sh:0.2, d:1,
                 bgSpeed:2.5, bgSat:1, bgBright:1, bgBlur:60, uiScale:1, cardAlpha:0,
-                boardTint:0.01, tileDepth:0.06, tileGloss:0, tileTex:0.25, emptyAlpha:0,
+                boardTint:0.01, tileDepth:0.06, tileGloss:0, tileTex:0.25, tileTexMobile:0, emptyAlpha:0,
                 perf:(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0 };
             const P = Object.assign({}, DEF);
             try { const v = localStorage.getItem('chamello_glass'); if (v) Object.assign(P, JSON.parse(v)); } catch (e) {}
@@ -3130,7 +3146,8 @@
               ['말판 대비','boardTint','말판 뒤 어두움 (배경 간섭 차단)',100,0,90],
               ['말판 대비','tileDepth','타일 아래쪽 진해짐 (유리 두께감)',100,0,70],
               ['말판 대비','tileGloss','타일 윗쪽 광택',100,0,60],
-              ['말판 대비','tileTex','유리 표면 질감',100,0,25],
+              ['말판 대비','tileTex','유리 표면 질감 (PC)',100,0,25],
+              ['말판 대비','tileTexMobile','유리 표면 질감 (모바일)',100,0,25],
               ['말판 대비','emptyAlpha','빈 칸 밝기',100,0,40],
               ['UI 유리','a','유리 바탕 불투명도',100,0,80],
               ['UI 유리','b','뒤 흐림 blur (px)',1,0,60],
@@ -3149,7 +3166,7 @@
             const VAR = { bw:['--bw','px'], gap:['--gap','px'], bp:['--bp','px'], r:['--gRadius','px'],
               ta:['--ta',''], ts:['--ts',''], edge:['--edge',''], ew:['--edgeW','px'], cellDepth:['--cellDepth','px'],
               a:['--gAlpha',''], b:['--gBlur','px'], s:['--gSat',''], bd:['--gBorder',''], hi:['--gHi',''], sh:['--gShadow',''], d:['--gDepth','px'],
-              boardTint:['--boardTint',''], tileDepth:['--tileDepth',''], tileGloss:['--tileGloss',''], tileTex:['--tileTex',''], emptyAlpha:['--emptyAlpha',''],
+              boardTint:['--boardTint',''], tileDepth:['--tileDepth',''], tileGloss:['--tileGloss',''], tileTex:['--tileTex',''], tileTexMobile:['--tileTexMobile',''], emptyAlpha:['--emptyAlpha',''],
               bgSpeed:['--bgSpeed',''], bgSat:['--bgSat',''], bgBright:['--bgBright',''], bgBlur:['--bgBlur','px'],
               uiScale:['--uiScale',''], cardAlpha:['--cardAlpha',''] };
             const BGN = { A:'메시 그라데이션', B:'고대비 컬러블록', C:'오로라', D:'듀오톤', E:'회전 무지개', F:'격자+블롭', G:'무지', H:'심해 파도', I:'네온 야경' };
@@ -3587,10 +3604,10 @@
                 nicknameSection.classList.remove('hidden');
             }
         }
-        document.getElementById('guest-link').addEventListener('click', () => {
-            guestMode = true;
-            updateLobbyUI();
-            nicknameInput.focus();
+        // [UX] Play as guest 제거 — QUICK PLAY 하나로 통합 (선택지 최소화)
+        const guestLinkEl = document.getElementById('guest-link');
+        if (guestLinkEl) guestLinkEl.addEventListener('click', () => {
+            guestMode = true; updateLobbyUI(); nicknameInput.focus();
         });
 
         // ===== [QUICKPLAY] 클릭 한 번에 이름 자동생성 + AI 대전 즉시 시작 =====
