@@ -281,7 +281,7 @@
           background:rgba(255,255,255,var(--cardAlpha))!important;border-color:rgba(255,255,255,calc(var(--gBorder)*.5))!important;
           backdrop-filter:blur(var(--gBlur)) saturate(var(--gSat));-webkit-backdrop-filter:blur(var(--gBlur)) saturate(var(--gSat));
           box-shadow:0 20px 60px rgba(0,0,0,var(--gShadow));border-radius:calc(var(--gRadius) + 6px);
-          transform:scale(var(--uiScale));transform-origin:top center;
+          transform-origin:top center;
         }
         /* 흰 배경/회색 배경 패널 → 유리 */
         body.glass-on .bg-white:not(#game-container):not(.cell),
@@ -413,7 +413,6 @@
         body.gs-perf .gs-layer[data-bg="H"] .wave{opacity:.6}
 
         /* 레이아웃 스래싱 완화 */
-        body.gs-perf #game-board .cell{will-change:auto;contain:paint}
 
 
         /* [GLASS] 검은 배경 요소도 유리로 — 원래 흰 UI 위 대비용으로 bg-black 이던 것들
@@ -586,8 +585,6 @@
         /* 무한 반복 장식 애니메이션은 성능 모드에서 정지 (지속 리페인트 제거) */
         body.gs-perf .breaker-shine{animation-duration:1.4s!important}
         /* 합성 레이어 격리 — 말판/카드가 서로의 리페인트를 유발하지 않게 */
-        body.glass-on #game-board{contain:layout paint}
-        body.glass-on #game-container{contain:layout}
         /* 탭 하이라이트·스크롤 관성 최적화 */
         body.gs-perf *{-webkit-tap-highlight-color:transparent}
         body.gs-perf #game-board .cell{transition:transform .07s ease, box-shadow .07s ease}
@@ -609,11 +606,6 @@
         body.gs-perf #game-board .cell.bg-player-yellow,
         body.gs-perf #game-board .cell.bg-player-blue{
           backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-        }
-        /* ② 빈 칸은 투명이라 흐림이 실제로 보이므로 유지 */
-        body.gs-perf #game-board .cell.bg-white{
-          backdrop-filter:blur(3px) saturate(var(--ts))!important;
-          -webkit-backdrop-filter:blur(3px) saturate(var(--ts))!important;
         }
         /* ③ 패널·말판·카드의 유리 흐림은 그대로 유지 (a=0이라 흐림이 곧 유리 표현) */
         body.gs-perf #game-container,
@@ -696,8 +688,16 @@
           background-color:rgba(255,255,255,calc(var(--emptyAlpha, .07) + .05))!important;
         }
 
-        /* ④ 합성 힌트 — 첫 프레임 깜빡임/타일 누락 방지 */
-        body.gs-perf #game-board{ -webkit-transform:translateZ(0); transform:translateZ(0); }
+
+
+        /* ==================== [MOBILE-GUARD] 최종 안전장치 ====================
+           모바일에서 렌더 깨짐을 유발하는 조합을 전역 차단.
+           (부모 transform + 자식 backdrop-filter, mask-composite, blend-mode) */
+        body.gs-perf *{ background-blend-mode:normal!important; mix-blend-mode:normal!important; }
+        body.gs-perf #game-board, body.gs-perf #game-board *{ contain:none!important; }
+        body.gs-perf #game-container{ transform:none!important; }
+        /* 유리 흐림은 '큰 면' 몇 곳에만 허용 — 개수가 적어야 안정적 */
+        body.gs-perf #game-board *:not(.cell){ backdrop-filter:none; -webkit-backdrop-filter:none; }
 
         /* [SCORE] 보너스 피드 토스트 */
         #bonus-feed {
@@ -3155,6 +3155,9 @@
             const BGN = { A:'메시 그라데이션', B:'고대비 컬러블록', C:'오로라', D:'듀오톤', E:'회전 무지개', F:'격자+블롭', G:'무지', H:'심해 파도', I:'네온 야경' };
             function apply(){
                 const R = document.documentElement.style;
+                // [iOS-FIX] 부모에 transform 이 걸리면 자식의 backdrop-filter 가 깨지므로 배율 1일 땐 제거
+                const gc = document.getElementById('game-container');
+                if (gc) gc.style.transform = (P.uiScale && P.uiScale !== 1) ? ('scale(' + P.uiScale + ')') : '';
                 for (const k in VAR){ if (P[k] !== undefined) R.setProperty(VAR[k][0], P[k] + VAR[k][1]); }
                 document.body.classList.toggle('glass-on', !!P.on);
                 if (IS_MOBILE) P.perf = 1;   // 모바일은 해제 불가
